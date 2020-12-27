@@ -1,23 +1,30 @@
 (ns fetch.grpc.watch
-  (:require [fetch.api.proto   :as proto]
-            [fetch.grpc.types  :as types]
+  (:require [fetch.grpc.types  :as types]
             [fetch.grpc.stream :as stream]
+            [fetch.store       :as store]
             [exoscale.ex       :as ex])
   (:import exoscale.etcd.api.WatchGrpc$WatchImplBase))
 
-(defn- make-watch-service
-  [{::proto/keys [watchbackend]}]
+(defmulti handle-request (fn [_ {:keys [type]}] type))
+
+(defmethod handle-request :create
+  [watcher req])
+
+(defmethod handle-request :cancel
+  [watcher req])
+
+(defn- make-service
+  [{::store/keys [engine]}]
   (proxy [WatchGrpc$WatchImplBase] []
     (watch [resp]
-      (reify io.grpc.stub.StreamObserver
-        (onNext [_ raw-req]
-          (let [{:keys [type] :as req} (types/watch-request->map raw-req)]
-            (if (= type :create)
-              (wrap-stream-call (partial proto/create-watch watchbackend req)
-                                resp)
-              (wrap-stream call (partial proto/cancel-watch watchbackend req)
-                           resp))))))))
+      (try
+        (let [watcher (store/make-watcher engine (make-notifier resp))]
+          (stream/make-observer
+           (partial handle-request watcher)
+           (partial handler-error watcher)))
+        (catch Exception e
+          (stream/error! e))))))
 
 (def watch
   (with-meta {}
-    {'fetch.grpc.server/get-service make-watch-service}))
+    {'fetch.grpc.server/get-service make-service}))
