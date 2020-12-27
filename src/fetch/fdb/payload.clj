@@ -4,50 +4,56 @@
   (:refer-clojure :exclude [key val])
   (:require [fetch.fdb.space :as space]
             [fetch.fdb.kv    :as kv]
-            [fetch.fdb.tuple :as tuple]
-            [fetch.fdb.dir   :as dir]))
+            [fetch.fdb.tuple :as tuple]))
 
 (defprotocol Serializer
   (key [_ k revision])
   (key-range [_ k])
-  (watch-key [_ watch-id])
+  (key-prefix [_ k prefix])
   (event-key [_ watch-id revision])
   (schema-key [_])
   (revision-key [_])
-  (decode-keyval [_ kv]))
-
-(def instance-id #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")
+  (decode-keyval [_ kv])
+  (watch-range [_])
+  (watch-key [_ prefix])
+  (watch-instance-key [_ instance]))
 
 (defn space-serializer
-  [db instance-id]
-  (let [dirs @(space/create-or-open (:fetch.fdb.db/database db)
-                                    (str instance-id))]
-    (reify Serializer
-      (key [_ k revision]
-        (space/from dirs :keys k revision))
-      (key-range [_ k]
-        (space/range dirs :keys k))
-      (watch-key [_ watch-id]
-        (space/from dirs :watches watch-id))
-      (event-key [_ watch-id revision]
-        (space/from dirs :events watch-id revision))
-      (schema-key [_]
-        (space/from dirs :schema))
-      (revision-key [_]
-        (space/from dirs :revision))
-      ;; Technically deserialization, but oh well.
-      (decode-keyval [_ kv]
-        (let [[kba vba]                (kv/as-tuple kv)
-              [k rev]                  (some-> (space/by-name dirs :keys)
-                                               (dir/unpack kba)
-                                               (tuple/expand))
-              [lease create-rev value] (some-> vba
-                                               tuple/decode-and-expand)]
-          {:key             k
-           :mod-revision    rev
-           :lease           lease
-           :create-revision create-rev
-           :value           value})))))
+  [dirs]
+  (reify Serializer
+    (key [_ k revision]
+      (space/from dirs :keys k revision))
+    (key-range [_ k]
+      (space/range dirs :keys k))
+    (key-prefix [_ k prefix]
+      (space/range dirs :keys k prefix))
+    (event-key [_ watch-id revision]
+      (space/from dirs :events watch-id revision))
+    (schema-key [_]
+      (space/from dirs :schema))
+    (revision-key [_]
+      (space/from dirs :revision))
+    ;; Technically deserialization, but oh well.
+    (decode-keyval [_ kv]
+      (let [[kba vba]                (kv/as-tuple kv)
+            [k rev]                  (some-> (space/by-name dirs :keys)
+                                             (space/unpack kba)
+                                             (tuple/expand))
+            [lease create-rev value] (some-> vba
+                                             tuple/decode-and-expand)]
+        {:key             k
+         :mod-revision    rev
+         :lease           lease
+         :create-revision create-rev
+         :value           value}))
+    (watch-range [_]
+      (space/range dirs :watches))
+    (watch-key [_ prefix]
+      (space/from dirs :watches prefix))
+    (watch-instance-key [_ instance]
+      (space/from dirs :instances instance))
+    (events-key [_ instance]
+      (space/from dirs :events instance))))
 
 (defn encode-val
   [lease-id create-revision value]
@@ -60,10 +66,6 @@
 (defn lease-ref
   [key]
   key)
-
-(defn watch-range
-  [begin end]
-  (tuple/pack-vals begin end))
 
 (defn watch-event
   [index key]
@@ -80,3 +82,11 @@
 (defn decode-revision
   [ba]
   (some-> ba tuple/decode tuple/get-long))
+
+(defn decode-watch
+  [^bytes ba]
+  (some-> ba tuple/decode-and-expand))
+
+(defn encode-watch
+  [instance id revision]
+  (tuple/pack-vals instance id revision))

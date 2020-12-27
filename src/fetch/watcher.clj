@@ -13,9 +13,10 @@
     (a/chain
      (store/register-watch-listener engine instance)
      (fn [{:keys [events-by-watch continue?]}]
-       (doseq [{:keys [events watch-id revision]} events-by-watch
-               :when                              (seq events)]
-         (publish-events publisher watch-id revision events))
+       (doseq [{:keys [events]} events-by-watch
+               :when            (seq events)]
+         ;; XXX: enough params here?
+         (publish-events publisher events))
        (when continue?
          (a/recur))))))
 
@@ -38,7 +39,7 @@
 
 (defn cancel-watch
   [watcher id]
-  (store/cancel-key-watch (::engine watcher) (::instance watcher) id key))
+  (store/cancel-key-watch (::engine watcher) (::instance watcher) id))
 
 (defn stop-watcher
   [watcher]

@@ -66,15 +66,12 @@
     (types/get-response rev kv)))
 
 (defn- range-prefix-handler
-  [engine {:keys [key revision range-end count-only? limit]}]
-  (let [ba     (byte-array (concat (map byte (drop-last range-end))
-                               [(-> range-end last byte dec byte)]))
-        prefix (cond-> (String. ba "UTF-8") (not= \/ (last s)) (str "/"))]
-    (if count-only?
-      (let [[rev num-keys] (store/count-keys engine prefix)]
-        (types/range-count-response rev num-keys))
-      (let [[rev kvs] (store/range-keys engine revision limit key prefix)]
-        (types/range-response rev limit kvs)))))
+  [engine {:keys [key revision count-only? limit]}]
+  (if count-only?
+    (let [[rev num-keys] (store/count-keys engine key)]
+      (types/range-count-response rev num-keys))
+    (let [[rev kvs] (store/range-keys engine revision limit key)]
+      (types/range-response rev limit kvs))))
 
 (defn- range-handler
   [engine {:keys [unsupported range-end] :as req}]

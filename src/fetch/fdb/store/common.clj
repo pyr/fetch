@@ -11,6 +11,17 @@
            (first)
            (p/decode-keyval sz)))
 
+(defn at-revision?
+  [tx sz k rev]
+  (let [p (previous tx sz k)]
+    (when (or (and (zero? rev) (nil? p))
+              (= rev (:mod-revision p)))
+      p)))
+
+(defn highest-revision
+  [tx sz]
+  @(op/get tx (p/revision-key sz)))
+
 (defn increment-revision
   [tx sz]
   (let [rk     (p/revision-key sz)

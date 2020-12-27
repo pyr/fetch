@@ -25,5 +25,7 @@
    (.range tr begin end reverse?)))
 
 (defn reverse-range
-  [tx range]
-  (range-with-range tx range range-no-limit true))
+  ([tx range]
+   (range-with-range tx range range-no-limit true))
+  ([tx range limit]
+   (range-with-range tx range (int limit) true)))
