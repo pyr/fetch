@@ -1,35 +1,23 @@
 (ns fetch.fdb
-  (:require [clojure.spec.alpha :as s]
-            [exoscale.ex        :as ex]
-            [fetch.fdb.fn       :as fn])
-  (:import com.apple.foundationdb.Database
-           com.apple.foundationdb.FDB
-           java.util.concurrent.Executor))
-
-(def default-path
-  "Default path for the cluster file"
-  "/etc/foundationdb/fdb.cluster")
-
-(defn- open
-  ([^String cluster-file ^Executor executor]
-   (let [fdb      (FDB/selectAPIVersion 630)
-         executor (or executor FDB/DEFAULT_EXECUTOR)]
-     (.open fdb cluster-file executor))))
+  (:require [clojure.spec.alpha    :as s]
+            [exoscale.ex           :as ex]
+            [fetch.fdb.db          :as db]
+            [fetch.fdb.store       :as store]
+            [clojure.tools.logging :as log])
+  (:import java.util.concurrent.Executor))
 
 (defn- component-start
   [{::keys [cluster-file executor] :as fdb}]
   (ex/assert-spec-valid ::config fdb)
-  (assoc fdb ::database (open cluster-file executor)))
+  (let [db (db/open cluster-file executor)]
+    (log/info "successfully opened connection to database")
+    (assoc fdb ::db/database db)))
 
 (defn- component-stop
-  [{::keys [database] :as fdb}]
+  [{::db/keys [database] :as fdb}]
   (when (some? database)
-    (.close ^Database database))
-  (dissoc fdb ::database))
-
-(defn run-in-transaction
-  [this f]
-  (.run ^Database (::database this) (fn/wrap f)))
+    (db/close database))
+  (dissoc fdb ::db/database))
 
 (defn make-database
   [opts]
@@ -42,6 +30,11 @@
    Expects `::cluster-file` in its configuration, and an optional
    `::executor` argument."
   (make-database {}))
+
+(def store
+  "A component which implements the main storage engine abstraction
+   from fetch"
+  (store/map->FDBStoreEngine {}))
 
 (s/def ::executor (partial instance? Executor))
 (s/def ::cluster-file string?)

@@ -1,3 +1,2 @@
 {:fetch.fdb/cluster-file    "/etc/foundationdb/fdb.cluster"
- :fetch.grpc.server/port    8080
- :fetch.grpc.server/address "127.0.0.1"}
+ :fetch.grpc.server/port    8080}

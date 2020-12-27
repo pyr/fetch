@@ -3,19 +3,27 @@
             [exoscale.mania             :as mania]
             [clojure.tools.logging      :as log]
             [clojure.spec.alpha         :as s]
-            [fetch.api                  :as api]
+            [fetch.store                :as store]
             [fetch.fdb                  :as fdb]
-            [fetch.grpc.service         :as service]
+            [fetch.grpc.kv              :as kv]
+            [fetch.grpc.lease           :as lease]
+            [fetch.grpc.watch           :as watch]
             [fetch.grpc.server          :as server])
   (:gen-class))
 
 (def components
   "The full map of operators and managers"
   {::fdb             (using fdb/handle    [::fdb/cluster-file])
-   ::kvapi           (using api/kv        {:db ::fdb})
-   ::kv              (using service/kv    {::service/kv-api ::kvapi})
-   ::server/services [::kv]
-   ::server          (using server/server [::server/services ::kv])})
+   ::store/engine    (using fdb/store [::fdb])
+   ::kv              (using kv/service [::store/engine])
+   ::lease           lease/service
+   ::watch           (using watch/service [::store/engine])
+   ::server/services [::kv ::lease ::watch]
+   ::server          (using server/server [::server/services
+                                           ::server/port
+                                           ::kv
+                                           ::lease
+                                           ::watch])})
 
 (defn build-system
   "We build a system map by merging the provided configuration
@@ -37,3 +45,16 @@
 ;; Configuration specs
 ;; ===================
 (s/def ::config (s/keys ))
+
+(comment
+
+  (require '[aero.core :as aero])
+
+  (def sys
+    (build-system
+     (aero/read-config "resources/config.edn")))
+
+  (def sys (component/start-system sys))
+
+  (def sys (component/stop-system sys))
+  )

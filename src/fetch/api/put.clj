@@ -6,25 +6,28 @@
   (:require [fetch.api.common   :as common]
             [fetch.fdb.payload  :as p]
             [fetch.fdb.op       :as op]
-            [exoscale.ex        :as ex]))
+            [exoscale.ex        :as ex]
+            [clojure.tools.logging :as log]))
 
 (defn handle
   [tx sz {:etcd.api.kv/keys [key value lease previous?
-                             ignore-value? ignore-lease?]}]
+                             ignore-value? ignore-lease?]
+          :as               req}]
 
-  (when (and (some? value) (true? ignore-value?))
-    (ex/ex-incorrect! "ignore_value was set for a payload containing a value"))
-  (when (and (some? lease) (true? ignore-lease?))
-    (ex/ex-incorrect! "ignore_lease was set for a payload containing a lease"))
+  (log/info "in put request for request:" (pr-str req))
+  (when (true? previous?)
+    (ex/ex-unsupported! "prevKv is unsupported in put requests"))
+  (when (true? ignore-value?)
+    (ex/ex-unsupported! "ignoreValue is unsupported in put requests"))
+  (when (true? ignore-lease?)
+    (ex/ex-unsupported! "ignoreLease is unsupported in put requests"))
 
   (let [rev        (common/increment-revision tx sz)
         previous   (common/previous tx sz key)
-        lease-id   (cond (some? lease) lease
-                         ignore-lease? (:fetch.api/lease previous)
-                         :else         0)
-        value      (if ignore-value? (:fetch.api/value previous) value)
-        create-rev (:fetch.api/create-revision previous)]
-    (op/set tx
-            (p/key sz key rev)
-            (p/encode-val lease-id create-rev value))
-    ))
+        lease-id   (if (some? lease) lease 0)
+        create-rev (if (some? previous)
+                     (:fetch.api/create-revision previous)
+                     rev)]
+    @(op/set tx
+             (p/key sz key rev)
+             (p/encode-val lease-id create-rev value))))
