@@ -26,7 +26,7 @@
 
 (defn run-in-transaction
   [this f]
-  (.run ^Database (::database this) (fn/wrap #(f % (::serializer this)))))
+  (.run ^Database (::database this) (fn/wrap #(f % (::dirs this)))))
 
 (defn create-dir
   [^TransactionContext txc path]
@@ -55,23 +55,20 @@
 (def ^:private static-instance-id
   #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")
 
-(defn- make-serializer
-  [db]
-  (let [dirs (make-dirs db static-instance-id)]
-    (payload/space-serializer dirs)))
-
 (defn- component-start
   [{::keys [cluster-file executor] :as fdb}]
   (ex/assert-spec-valid ::config fdb)
   (let [db (open cluster-file executor)]
     (log/info "successfully opened connection to database")
-    (assoc fdb ::database db ::serializer (make-serializer db))))
+    (assoc fdb
+           ::database db
+           ::dirs (make-dirs db static-instance-id))))
 
 (defn- component-stop
   [{::keys [database] :as fdb}]
   (when (some? database)
     (close database))
-  (dissoc fdb ::database ::serializer))
+  (dissoc fdb ::database ::dirs))
 
 (defn make-database
   [opts]

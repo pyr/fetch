@@ -12,6 +12,14 @@
   [^Transaction tr ^bytes k ^bytes v]
   (.set tr k v))
 
+(defn clear
+  [^Transaction tr ^bytes k]
+  (.clear tr k))
+
+(defn clear-range
+  [^Transaction tr ^Range r]
+  (.clear tr r))
+
 (def range-no-limit
   ReadTransaction/ROW_LIMIT_UNLIMITED)
 
@@ -29,3 +37,7 @@
    (range-with-range tx range range-no-limit true))
   ([tx range limit]
    (range-with-range tx range (int limit) true)))
+
+(defn watch
+  [^Transaction tx ^bytes key]
+  (.watch tx key))

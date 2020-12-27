@@ -261,6 +261,41 @@
             (.build))])
       (.build)))
 
+(defn ^TxnResponse update-success-response
+  [rev]
+  (-> (TxnResponse/newBuilder)
+      (.setSucceeded true)
+      (.setHeader (rev-header rev))
+      (.addAllResponses
+       [(-> (ResponseOp/newBuilder)
+            (.setResponsePut (-> (PutResponse/newBuilder)
+                                 (.setHeader (rev-header rev))
+                                 (.build)))
+            (.build))])
+      (.build)))
+
+(defn ^TxnResponse update-failure-response
+  [rev kv]
+  ;; XXX: bad payload
+  (-> (TxnResponse/newBuilder)
+      (.setSucceeded false)
+      (.setHeader (rev-header rev))
+      (.build)))
+
+(defn ^TxnResponse delete-response
+  [rev kv succeeded?]
+  ;; XXX: bad payload
+  (-> (TxnResponse/newBuilder)
+      (.setSucceeded succeeded?)
+      (.setHeader (rev-header rev))
+      (.addAllResponses
+       [(-> (ResponseOp/newBuilder)
+            (.setResponseDeletRange (-> (DeleteRangeResponse/newBuilder)
+                                        (.setHeader (rev-header rev))
+                                        (.build)))
+            (.build))])
+      (.build)))
+
 (def txn-compaction-response
   (-> (TxnResponse/newBuilder)
       (.setHeader (-> (ResponseHeader/newBuilder)
@@ -329,3 +364,26 @@
      :start-revision (some-> req .getCreateRequest .getStartRevision)}
     {:type     :cancel
      :watch-id (-> req .getCancelRequest .getWatchId)}))
+
+(defmulti map->watch-response :type)
+
+(defmethod map->watch-response :create
+  [{:keys [watch-id]}]
+  (-> (WatchResponse/newBuilder)
+      (.setWatchId watch-id)
+      (.setCreated true)
+      (.build)))
+
+(defmethod map->watch-response :cancel
+  [{:keys [watch-id]}]
+  (-> (WatchResponse/newBuilder)
+      (.setWatchId watch-id)
+      (.setCancelled true)
+      (.setCancelReason "watch closed")
+      (.build)))
+
+(defmethod map->watch-response :events
+  [{:keys [watch-id revision events]}]
+  (-> (WatchResponse/newBuilder)
+      (.setWatchId watch-id)
+      (.build)))

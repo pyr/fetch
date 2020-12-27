@@ -13,32 +13,27 @@
                                  (:key req)
                                  (:start-revision req))]
     (notifier {:type     :created
-               :created  true
                :watch-id id})))
 
 (defmethod handle-request :cancel
   [watcher notifier req]
   (watcher/cancel-watch watcher (:watch-id req))
-  (notifier {:type          :cancelled
-             :cancelled     true
-             :cancel-reason "watch closed"
-             :watch-id      (:watch-id req)}))
+  (notifier {:type     :cancelled
+             :watch-id (:watch-id req)}))
 
 (defn handle-error
   [watcher resp e]
-  (watcher/stop-watcher watcher (ex-message e))
+  (watcher/stop-watcher watcher)
   (stream/error! resp e))
 
 (defn- make-publisher
-  [watcher notifier resp]
+  [notifier]
   (reify watcher/WatchPublisher
     (publish-events [_ watch-id revision events]
       (notifier {:type     :events
                  :revision revision
                  :watch-id watch-id
-                 :events   events}))
-    (on-error [_ e]
-      (handle-error watcher resp e))))
+                 :events   events}))))
 
 (defn- make-observer
   [watcher notifier resp]
@@ -51,20 +46,17 @@
    (fn [e]
      (handle-error watcher resp e))
    (fn []
-     (watcher/stop-watcher watcher "stream completed"))))
+     (watcher/stop-watcher watcher))))
 
 (defn- make-service
   [{::store/keys [engine]}]
   (proxy [WatchGrpc$WatchImplBase] []
     (watch [resp]
-      (try
-        (let [notifier  #(stream/on-next resp (types/map->watch-response %))
-              publisher (make-publisher watcher notifier resp)
-              watcher   (watcher/make-watcher engine publisher)]
-          (make-observer watcher notifier resp))
-        (catch Exception e
-          (stream/error! resp e))))))
+      (let [notifier  #(stream/on-next resp (types/map->watch-response %))
+            publisher (make-publisher notifier)
+            watcher   (watcher/make-watcher engine publisher)]
+        (make-observer watcher publisher resp)))))
 
-(def watch
+(def service
   (with-meta {}
     {'fetch.grpc.server/get-service make-service}))

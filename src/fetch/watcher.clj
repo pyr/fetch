@@ -4,8 +4,7 @@
   (:import java.util.UUID))
 
 (defprotocol WatchPublisher
-  (on-error [this e])
-  (publish-events [this events]))
+  (publish-events [this watch-id revision events]))
 
 (defn watch-loop
   [engine publisher instance]
@@ -13,10 +12,10 @@
     (a/chain
      (store/register-watch-listener engine instance)
      (fn [{:keys [events-by-watch continue?]}]
-       (doseq [{:keys [events]} events-by-watch
-               :when            (seq events)]
+       (doseq [{:keys [events watch-id revision]} events-by-watch
+               :when                              (seq events)]
          ;; XXX: enough params here?
-         (publish-events publisher events))
+         (publish-events publisher watch-id revision events))
        (when continue?
          (a/recur))))))
 

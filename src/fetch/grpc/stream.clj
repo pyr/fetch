@@ -34,4 +34,4 @@
     (onCompleted [_]
       (completed-fn))
     (onError [_ e]
-      (error-fn msg))))
+      (error-fn e))))

@@ -18,6 +18,6 @@
     (leaseLeases [_ resp]
       (stream/error! (ex/ex-unsupported "listing leases is not supported")))))
 
-(def lease
+(def service
   (with-meta {}
     {'fetch.grpc.server/get-service (constantly lease-service)}))

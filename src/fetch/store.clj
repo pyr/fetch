@@ -13,5 +13,5 @@
   (create-watch-instance [this instance])
   (delete-watch-instance [this instance])
   (register-key-watch [this instance id prefix revision])
-  (cancel-key-watch [this instance id prefix])
+  (cancel-key-watch [this instance id])
   (register-watch-listener [this instance]))

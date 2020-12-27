@@ -101,9 +101,9 @@
         (range-fn req resp))
       (txn [req resp]
         ;; XXX: debug
-        (reset! last-txn-request raw-req)
+        (reset! last-txn-request req)
         (txn-fn req resp)))))
 
-(def kv
+(def service
   (with-meta {}
     {'fetch.grpc.server/get-service make-service}))
