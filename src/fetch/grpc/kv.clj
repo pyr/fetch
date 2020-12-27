@@ -53,10 +53,10 @@
   (when (some? unsupported)
     (ex/ex-unsupported! unsupported))
   (case type
-      :update  (update-handler engine req)
-      :delete  (delete-handler engine req)
-      :create  (create-handler engine req)
-      :compact types/txn-compaction-response))
+    :update  (update-handler engine req)
+    :delete  (delete-handler engine req)
+    :create  (create-handler engine req)
+    :compact types/txn-compaction-response))
 
 (defn- get-handler
   [engine {:keys [key revision]}]

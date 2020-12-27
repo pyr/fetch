@@ -27,7 +27,6 @@
 (defmethod type->log ::ex/invalid-spec [_] true)
 (defmethod type->log :default [_] true)
 
-
 (def status->status
   {:aborted             Status/ABORTED
    :already-exists      Status/ALREADY_EXISTS

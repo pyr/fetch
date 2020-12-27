@@ -81,7 +81,6 @@
     (pos? (.getSortOrderValue req))    (assoc :unsupported "SortOrder")
     (pos? (.getSortTargetValue req))   (assoc :unsupported "SortTarget")))
 
-
 (defn put-request->map
   [^PutRequest req]
   {:key           (to-string (.getKey req))

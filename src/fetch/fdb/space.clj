@@ -23,7 +23,6 @@
   ([^Subspace space ^bytes bytes]
    (.unpack space bytes)))
 
-
 (defn ^Range subrange
   ([^Subspace sub]
    (.range sub))

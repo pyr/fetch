@@ -50,7 +50,6 @@
   (log/info "server shutdown completed")
   (dissoc this ::server))
 
-
 (defn make-server
   [opts]
   (with-meta opts

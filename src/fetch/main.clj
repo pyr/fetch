@@ -44,7 +44,7 @@
 
 ;; Configuration specs
 ;; ===================
-(s/def ::config (s/keys ))
+(s/def ::config (s/keys))
 
 (comment
 
@@ -56,5 +56,4 @@
 
   (def sys (component/start-system sys))
 
-  (def sys (component/stop-system sys))
-  )
+  (def sys (component/stop-system sys)))
