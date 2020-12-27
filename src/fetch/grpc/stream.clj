@@ -25,3 +25,13 @@
   [resp v]
   (on-next resp v)
   (on-completed resp))
+
+(defn make-observer
+  [new-message-fn error-fn completed-fn]
+  (reify StreamObserver
+    (onNext [_ msg]
+      (new-message-fn msg))
+    (onCompleted [_]
+      (completed-fn))
+    (onError [_ e]
+      (error-fn msg))))

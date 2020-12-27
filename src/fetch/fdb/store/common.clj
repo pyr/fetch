@@ -1,4 +1,4 @@
-(ns fetch.api.common
+(ns fetch.fdb.store.common
   (:require [fetch.fdb.payload     :as p]
             [fetch.fdb.op          :as op]
             [clojure.tools.logging :as log]))

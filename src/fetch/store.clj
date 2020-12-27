@@ -1,8 +1,7 @@
-(ns fetch.store
-  (:require [qbits.auspex :as a])
-  (:import java.util.UUID))
+(ns fetch.store)
 
 (defprotocol StorageEngine
+  ;; KV specific
   (create-if-absent [this key value lease])
   (update-at-revision [this key revision value lease])
   (count-keys [this prefix])
@@ -10,26 +9,9 @@
   (get-at-revision [this key revision])
   (get-latest [this key])
   (delete-key [this key revision])
-  (create-watch-key [this id key value])
-  (cancel-watch [this id])
-  (get-revision [this]))
-
-(defprotocol WatchNotifier
-  ())
-
-(defrecord Watcher [engine notifier])
-
-(defn make-watcher
-  [engine notifier pool]
-  (let [watcher {::engine   engine
-                 ::notifier notifier
-                 ::id       (UUID/randomUUID)}
-        rev     (get-revision engine)
-
-        ]
-    (create-watch-key engine id key value)
-
-
-    ()
-
-    ))
+  ;; Watch specific
+  (create-watch-instance [this instance])
+  (delete-watch-instance [this instance])
+  (register-key-watch [this instance id prefix revision])
+  (cancel-key-watch [this instance id prefix])
+  (register-watch-listener [this instance]))

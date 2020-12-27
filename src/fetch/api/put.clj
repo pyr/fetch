@@ -22,12 +22,4 @@
   (when (true? ignore-lease?)
     (ex/ex-unsupported! "ignoreLease is unsupported in put requests"))
 
-  (let [rev        (common/increment-revision tx sz)
-        previous   (common/previous tx sz key)
-        lease-id   (if (some? lease) lease 0)
-        create-rev (if (some? previous)
-                     (:fetch.api/create-revision previous)
-                     rev)]
-    @(op/set tx
-             (p/key sz key rev)
-             (p/encode-val lease-id create-rev value))))
+  )
