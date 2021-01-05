@@ -1,0 +1,33 @@
+@startuml architecture
+
+!include https://docs.sos-ch-dk-2.exo.io/components.puml
+
+title Fetch architecture
+
+Boundary(backend, "backend") {
+  Component(fdb, "fdb")
+  Component(engine, "storage engine")
+}
+
+Boundary(services, "services") {
+   Component(kv, "kv")
+   Component(lease, "lease")
+   Component(watch, "watch")
+}
+
+Boundary(server, "server") {
+   Component(grpc, "grpc server")
+}
+
+engine -> fdb
+kv -> engine
+watch -> engine
+
+grpc -> kv
+grpc -> lease
+grpc -> watch
+
+server -[hidden]--> services
+services -[hidden]--> backend
+
+@enduml

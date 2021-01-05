@@ -31,24 +31,25 @@
 (defn key-range [dirs k]
   (space/range dirs :keys k))
 
-(defn key-prefix [dirs k prefix]
-  (space/range dirs :keys k prefix))
-
 (defn schema-key [dirs]
   (space/from dirs :schema))
 
-(defn decode-keyval [dirs kv]
+(defn decode-key
+  [dirs kba]
+  (let [[k rev] (some-> (space/by-name dirs :keys)
+                        (space/unpack kba)
+                        (tuple/expand))]
+    {:mod-revision rev
+     :key          k}))
+
+(defn decode-keyval
+  [dirs kv]
   (let [[kba vba]                (kv/as-tuple kv)
-        [k rev]                  (some-> (space/by-name dirs :keys)
-                                         (space/unpack kba)
-                                         (tuple/expand))
-        [lease create-rev value] (some-> vba
-                                         tuple/decode-and-expand)]
-    {:key             k
-     :mod-revision    rev
-     :lease           lease
-     :create-revision create-rev
-     :value           value}))
+        key-data                 (decode-key dirs kba)
+        [lease create-rev value] (some-> vba tuple/decode-and-expand)]
+    (merge key-data {:lease           lease
+                     :create-revision create-rev
+                     :value           value})))
 
 (defn encode-val
   [lease-id create-revision value]

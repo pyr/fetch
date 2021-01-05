@@ -1,7 +1,6 @@
 (ns fetch.fdb.db
   (:require [fetch.fdb.fn          :as fn]
             [fetch.fdb.tuple       :as tuple]
-            [fetch.fdb.payload     :as payload]
             [qbits.auspex          :as a]
             [exoscale.ex           :as ex]
             [clojure.tools.logging :as log]

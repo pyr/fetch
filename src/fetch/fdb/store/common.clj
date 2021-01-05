@@ -4,31 +4,31 @@
             [clojure.tools.logging :as log]))
 
 (defn previous
-  [tx sz k]
-  (some->> (p/key-range sz k)
+  [tx dirs k]
+  (some->> (p/key-range dirs k)
            (op/reverse-range tx)
            (deref)
            (first)
-           (p/decode-keyval sz)))
+           (p/decode-keyval dirs)))
 
 (defn at-revision?
-  [tx sz k rev]
-  (let [p (previous tx sz k)]
+  [tx dirs k rev]
+  (let [p (previous tx dirs k)]
     (when (or (and (zero? rev) (nil? p))
               (= rev (:mod-revision p)))
       p)))
 
 (defn highest-revision
-  [tx sz]
-  @(op/get tx (p/revision-key sz)))
+  [tx dirs]
+  @(op/get tx (p/revision-key dirs)))
 
 (defn increment-revision
-  [tx sz]
-  (let [rk     (p/revision-key sz)
+  [tx dirs]
+  (let [rk     (p/revision-key dirs)
         value  @(op/get tx rk)
         found? (some? value)
         rev    (inc (if found? (p/decode-revision value) 0))]
     (when-not found?
       (log/warn "revision is unset, will initialize to 1"))
-    (op/set tx rk (p/encode-revision rev))
+    @(op/set tx rk (p/encode-revision rev))
     rev))

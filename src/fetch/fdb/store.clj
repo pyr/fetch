@@ -16,7 +16,7 @@
       (let [new-rev (common/increment-revision tx dirs)]
         @(a/chain (op/set tx (p/key dirs key new-rev)
                           (p/encode-val lease-id 0 value))
-                  (constantly [new-rev true]))))))
+                  (constantly [new-rev true])))) ))
 
 (defn update-at-revision
   [tx dirs key revision value lease]
@@ -30,18 +30,29 @@
 
 (defn count-keys
   [tx dirs prefix]
-  @(a/chain (op/reverse-range tx (p/key-prefix dirs prefix))
+  @(a/chain (op/reverse-range tx (p/key-range dirs prefix))
             (fn [kvs]
-              [(common/highest-revision tx dirs) (count kvs)])))
+              [(common/highest-revision tx dirs)
+               (->> kvs
+                    (map kv/k)
+                    (map (partial p/decode-key dirs))
+                    (map :mod-revision)
+                    (distinct)
+                    (count))])))
 
 (defn range-keys
   [tx dirs revision limit prefix]
-  (filter #(>= (:mod-revision %) revision)
-          @(op/reverse-range tx (p/key-prefix dirs prefix) limit)))
+  (->> @(op/reverse-range tx (p/key-range dirs prefix) limit)
+       (map kv/k)
+       (map (partial p/decode-key dirs))
+       (partition-by :mod-revision)
+       (map first)
+       (filter #(>= (:mod-revision %) revision))))
 
 (defn get-at-revision
   [tx dirs key revision]
-  @(op/get tx (p/key dirs key revision)))
+  (some->> @(op/get tx (p/key dirs key revision))
+           (p/decode-keyval dirs)))
 
 (defn get-latest
   [tx dirs key]
