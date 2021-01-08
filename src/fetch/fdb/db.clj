@@ -48,9 +48,10 @@
   All subspaces will be located in a FoundationDB *directory*,
   with the top-level name, and the etcd instance ID"
   [db prefix instance-id]
-  (let [dir (create-dir db [prefix instance-id])]
-    (reduce #(assoc %1 %2 (subdir db dir %2))
-            {::top dir}
+  (let [topdir      (create-dir db [prefix])
+        instancedir (create-dir db [prefix instance-id])]
+    (reduce #(assoc %1 %2 (subdir db instancedir %2))
+            {::top topdir ::instance instancedir}
             [:keys :instances :watches :events :metadata :revision])))
 
 (defn top-dir

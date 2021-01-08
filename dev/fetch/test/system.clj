@@ -1,6 +1,5 @@
 (ns fetch.test.system
   (:require [com.stuartsierra.component :as component :refer [using]]
-            [clojure.tools.logging      :as log]
             [fetch.store                :as store]
             [fetch.fdb                  :as fdb]
             [fetch.fdb.db               :as db]
@@ -21,14 +20,22 @@
   (db/run-in-transaction
    fdb
    (fn [tx dirs]
-     (doseq [d (reverse (vals dirs))]
-       (log/info "clearing range for:" (seq (.getPath d)))
+     (doseq [[k d] dirs
+             :when (simple-keyword? k)]
        (op/clear-range tx (space/subrange d))
-       (db/remove-dir tx d)))))
+       (db/remove-dir tx d))
+     (op/clear-range tx (space/subrange (::db/instance dirs)))
+     (db/remove-dir tx (::db/instance dirs))
+     (op/clear-range tx (space/subrange (::db/top dirs)))
+     (db/remove-dir tx (::db/top dirs))))
+  (doseq [[k d] (-> fdb ::db/dirs)
+          :when (simple-keyword? k)]
+    (db/remove-dir (db/get-handle fdb) d))
+  (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/instance))
+  (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/top)))
 
 (def cleaner
-  (with-meta {} {} ;;{`component/stop purge-directories}
-    ))
+  (with-meta {} {`component/stop purge-directories}))
 
 (defn fdb-system
   []
