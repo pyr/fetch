@@ -6,6 +6,7 @@
   (:import com.apple.foundationdb.Database
            com.apple.foundationdb.FDB
            com.apple.foundationdb.TransactionContext
+           com.apple.foundationdb.directory.Directory
            com.apple.foundationdb.directory.DirectoryLayer
            com.apple.foundationdb.directory.DirectorySubspace
            com.apple.foundationdb.subspace.Subspace
@@ -33,11 +34,10 @@
         (deref))))
 
 (defn remove-dir
-  [^TransactionContext txc path]
-  (let [path (mapv str (if (coll? path) path [path]))]
-    (-> (DirectoryLayer.)
-        (.removeIfExists txc path)
-        (deref))))
+  [^TransactionContext txc ^Directory dir]
+  (-> (DirectoryLayer.)
+      (.removeIfExists txc (.getPath dir))
+      (deref)))
 
 (defn ^Subspace subdir
   [^TransactionContext txc ^DirectorySubspace dir path]
@@ -50,8 +50,16 @@
   [db prefix instance-id]
   (let [dir (create-dir db [prefix instance-id])]
     (reduce #(assoc %1 %2 (subdir db dir %2))
-            {}
+            {::top dir}
             [:keys :instances :watches :events :metadata :revision])))
+
+(defn top-dir
+  [db]
+  (some-> db ::dirs ::top))
+
+(defn get-handle
+  [db]
+  (::database db))
 
 (def ^:private static-instance-id
   #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")

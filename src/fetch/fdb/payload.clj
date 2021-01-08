@@ -31,6 +31,10 @@
 (defn key-range [dirs k]
   (space/range dirs :keys k))
 
+
+(defn key-prefix [dirs k]
+  (space/range-prefix dirs :keys k))
+
 (defn schema-key [dirs]
   (space/from dirs :schema))
 

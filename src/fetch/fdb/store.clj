@@ -35,18 +35,20 @@
      (->> kvs
           (map kv/k)
           (map (partial p/decode-key dirs))
-          (map :mod-revision)
+          (map :key)
           (distinct)
           (count))]))
 
 (defn range-keys
   [tx dirs revision limit prefix]
-  (->> (op/reverse-range tx (p/key-range dirs prefix) limit)
-       (map kv/k)
-       (map (partial p/decode-key dirs))
-       (partition-by :mod-revision)
-       (map first)
-       (filter #(>= (:mod-revision %) revision))))
+  (let [range (p/key-prefix dirs prefix)]
+    (prn {:range range})
+    (->> (op/reverse-range tx range limit)
+         (map kv/k)
+         (map (partial p/decode-key dirs))
+         (partition-by :key)
+         (map first)
+         (filter #(>= (:mod-revision %) revision)))))
 
 (defn get-at-revision
   [tx dirs key revision]

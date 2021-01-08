@@ -6,6 +6,19 @@
            com.apple.foundationdb.tuple.Tuple
            com.apple.foundationdb.Range))
 
+(defn starts-with
+  [prefix]
+  (Range/startsWith (tuple/encode-and-pack prefix)))
+
+(defn bounded
+  [begin end]
+  (Range. (tuple/encode-and-pack begin)
+          (tuple/encode-and-pack end)))
+
+(defn bounded-bytes
+  [begin end]
+  (Range. ^bytes begin ^bytes end))
+
 (defn by-name
   [dirs space]
   (or (get dirs space)
@@ -32,6 +45,28 @@
 (defn range
   [dirs space & objs]
   (subrange (by-name dirs space) (tuple/from-seq objs)))
+
+(defn- inc-prefix
+  "Given an object path, yield the next semantic one."
+  [^String p]
+  (when (seq p)
+    (let [[c & s]  (reverse p)
+          reversed (conj s (-> c int inc char))]
+      (->> reversed
+           reverse
+           (map byte)
+           byte-array))))
+
+(defn- concat-arrays
+  [^bytes b1 ^bytes b2]
+  (byte-array (concat (seq b1) (seq b2))))
+
+(defn range-prefix
+  [dirs space prefix]
+  (let [head  (pack (by-name dirs space))
+        start (byte-array (map byte prefix))
+        end   (inc-prefix prefix)]
+    (bounded-bytes (concat-arrays head start) (concat-arrays head end))))
 
 (defn from-seq
   [dirs space objs]
