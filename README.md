@@ -100,7 +100,7 @@ are installed:
 - `watches`: A subspace to store watches
 - `events`: A subspace to store watch events.
 
-For more details on the FoundationDB implementation, please refer to: [](docs/foundationdb.md)
+For more details on the FoundationDB implementation, please refer to: [docs/foundationdb](docs/foundationdb.md)
 
 ### Inspiration and Documentation
 
