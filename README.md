@@ -152,3 +152,4 @@ https://github.com/k3s-io/kine/
 - [ADR003: Treating all keys as strings](docs/adrs/adr003.md)
 - [ADR002: External artifact for GRPC definitions](docs/adrs/adr002.md)
 - [ADR001: Synchronous threading model](docs/adrs/adr001.md)
+- [ADR000: Building Fetch in Clojure](docs/adrs/adr000.md)
