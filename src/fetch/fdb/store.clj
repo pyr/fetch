@@ -42,7 +42,6 @@
 (defn range-keys
   [tx dirs revision limit prefix]
   (let [range (p/key-prefix dirs prefix)]
-    (prn {:range range})
     (->> (op/reverse-range tx range limit)
          (map kv/k)
          (map (partial p/decode-key dirs))
