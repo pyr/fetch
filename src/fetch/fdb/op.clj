@@ -6,19 +6,19 @@
 
 (defn get
   [^ReadTransaction tr ^bytes k]
-  (.get tr k))
+  @(.get tr k))
 
 (defn set
   [^Transaction tr ^bytes k ^bytes v]
-  (.set tr k v))
+  @(.set tr k v))
 
 (defn clear
   [^Transaction tr ^bytes k]
-  (.clear tr k))
+  @(.clear tr k))
 
 (defn clear-range
   [^Transaction tr ^Range r]
-  (.clear tr r))
+  @(.clear tr r))
 
 (def range-no-limit
   ReadTransaction/ROW_LIMIT_UNLIMITED)
@@ -26,9 +26,10 @@
 (defn range-with-range
   ([^ReadTransaction tr ^Range rangedef limit reverse?]
    (-> (.getRange tr rangedef (int limit) (boolean reverse?))
-       (.asList))))
+       (.asList)
+       (deref))))
 
-(defn range-with-boundaries
+#_(defn range-with-boundaries
   ([^ReadTransaction tr begin end reverse?]
    (.range tr begin end reverse?)))
 

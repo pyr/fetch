@@ -112,7 +112,7 @@
                    ;; XXX: need to better format here
                    :events-by-watch (group-by :watch-id results)}))))))
 
-(defrecord FDBStoreEngine [db dirs]
+(defrecord FDBStoreEngine [db]
   store/StorageEngine
   (create-if-absent [_ key value lease]
     (db/run-in-transaction db
@@ -164,3 +164,24 @@
     (db/run-in-transaction db
                            (fn [tx dirs]
                              (register-watch-listener db tx dirs instance)))))
+
+(comment
+  (require '[com.stuartsierra.component :as component]
+           '[fetch.fdb.op :as op]
+           '[fetch.fdb.db :as db]
+           '[fetch.fdb.payload :as p]
+           '[fetch.fdb.kv :as kv])
+
+  (def handle
+    (component/start
+     (db/make-database {::db/cluster-file "/etc/foundationdb/fdb.cluster"})))
+
+  (def store (component/start (map->FDBStoreEngine {:db handle})))
+
+  handle
+
+  store
+  (store/create-if-absent store "foo" (.getBytes "bar") 2)
+  (p/encode-revision 1)
+  (db/run-in-transaction handle (fn [tx dirs] @(op/get tx (p/revision-key dirs))))
+  )

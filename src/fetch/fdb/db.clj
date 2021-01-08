@@ -1,7 +1,5 @@
 (ns fetch.fdb.db
   (:require [fetch.fdb.fn          :as fn]
-            [fetch.fdb.tuple       :as tuple]
-            [qbits.auspex          :as a]
             [exoscale.ex           :as ex]
             [clojure.tools.logging :as log]
             [clojure.spec.alpha    :as s])
@@ -31,25 +29,22 @@
   [^TransactionContext txc path]
   (let [path (mapv str (if (coll? path) path [path]))]
     (-> (DirectoryLayer.)
-        (.createOrOpen txc path))))
+        (.createOrOpen txc path)
+        (deref))))
 
-(defn ^Subspace subspace
-  [^DirectorySubspace dir path]
-  (.subspace dir (tuple/encode path)))
+(defn ^Subspace subdir
+  [^TransactionContext txc ^DirectorySubspace dir path]
+  @(.createOrOpen dir txc [(name path)]))
 
 (defn make-dirs
   "Creates a map of subspaces for the various data needed.
   All subspaces will be located in a FoundationDB *directory*,
   with the top-level name, and the etcd instance ID"
   [db instance-id]
-  @(a/chain (create-dir db ["etcd" instance-id])
-            (fn [dir]
-              {:keys     (subspace dir "k")
-               :instance (subspace dir "i")
-               :watches  (subspace dir "w")
-               :events   (subspace dir "e")
-               :metadata (subspace dir "m")
-               :revision (subspace dir "r")})))
+  (let [dir (create-dir db ["etcd" instance-id])]
+    (reduce #(assoc %1 %2 (subdir db dir %2))
+            {}
+            [:keys :instances :watches :events :metadata :revision])))
 
 (def ^:private static-instance-id
   #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")

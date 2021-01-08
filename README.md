@@ -40,6 +40,13 @@ responses.
 The necessary signatures to implement in the service are thus
 `txn`, with only a few different shapes of transactions and `range`.
 
+### Threading model
+
+While the FDB API is built around `CompletableFuture` and is inherently
+async. This daemon takes a resolute synchronous approach, allocating one
+thread per request. Most low level functions to interact with the key space
+deref the returned future.
+
 ### Shape of the fetch daemon
 
 Fetch tries to abstract what is necessary for a storage layer to expose
@@ -91,44 +98,57 @@ are installed:
 - `revision`: A subspace to store the current write revision
 - `instance`: A subspace to store watch instances
 - `watches`: A subspace to store watches
-- `events`: A subspace to store watch events
+- `events`: A subspace to store watch events.
 
-##### The keys subspace
+For more details on the FoundationDB implementation, please refer to: [docs/foundationdb.md]
 
-This subspace uses the following key and value structure:
+### Inspiration and Documentation
 
-- key: `{key []byte, revision int}`
-- value: `{lease-id int, create-revision int, value []byte}`
+### Kubernetes `etcd3` storage engine
 
-##### The revision subspace
+The Kubernetes `etcd3` storage engine:
+https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/apiserver/pkg/storage/etcd3
+holds all interaction between Kubernetes and etcd.
 
-This subspace is used to store a single int value, the current revision. It is
-used to atomically increase and retrieve the current global revision.
+Some areas need more attention than others:
 
-##### The metadata subspace
+- [The compactor comments](https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/storage/etcd3/compact.go#L73)
+  notably explain the design of the special `compactRevKey` key.
+- [The lease manager comments](https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/storage/etcd3/lease_manager.go)
+  explain how leases are used in Kubernetes.
+- Throughout this package, all interactions with the store's internal `client`
+  member must be analyzed, since they represent all actual interactions with
+  etcd.
 
-*currently unused*
+### FoundationDB documentation and Javadoc
 
-##### The watch instance subspace
+To understand the decisions behind the design of the FoundationDB
+schema, it is worthwhile going through the FoundationDB [developer
+guide](https://apple.github.io/foundationdb/developer-guide.html)
 
-A subspace to store currently started watch sessions. Structure:
+Navigation of the FoundationDB documentation being a bit lacking, it is
+also often useful to explore the contents of the documentation's
+[sitemap](https://apple.github.io/foundationdb/contents.html).
 
-- key: `{instance int}`
-- value: `nil`
+Last, to understand the interaction with Clojure, the
+[javadoc](https://apple.github.io/foundationdb/javadoc/index.html) is also a
+great source.
 
-##### The watches subspace
+### Kine
 
-This subspace is used to store the currently watched prefixes to allow matching
-them when key operations occur. It uses the following structure:
+Kine is an etcd server backed by SQL databases. Fetch's design is similar
+in some ways and they share a number of common compromises.
 
-- key: `{prefix string}`
-- value: `{instance int, id int, revision int}`
+https://github.com/k3s-io/kine/
 
-##### The watch event subspace
 
-This subspace is used to store events pertaining to a specific watch instance.
-Events are stored per instance
+### Changelog
 
-##### Operation breakdown
+*no release yet*
 
-A per operation breakdown of what is done is available here: [](docs/fdb-operations.md)
+### Architecture Decision Records
+
+- [ADR004: Implementing the kubernetes subset only](docs/adrs/adr004.md)
+- [ADR003: Treating all keys as strings](docs/adrs/adr003.md)
+- [ADR002: External artifact for GRPC definitions](docs/adrs/adr002.md)
+- [ADR001: Synchronous threading model](docs/adrs/adr001.md)

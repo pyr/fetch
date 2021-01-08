@@ -7,7 +7,6 @@
   [tx dirs k]
   (some->> (p/key-range dirs k)
            (op/reverse-range tx)
-           (deref)
            (first)
            (p/decode-keyval dirs)))
 
@@ -20,15 +19,15 @@
 
 (defn highest-revision
   [tx dirs]
-  @(op/get tx (p/revision-key dirs)))
+  (op/get tx (p/revision-key dirs)))
 
 (defn increment-revision
   [tx dirs]
   (let [rk     (p/revision-key dirs)
-        value  @(op/get tx rk)
+        value  (op/get tx rk)
         found? (some? value)
         rev    (inc (if found? (p/decode-revision value) 0))]
     (when-not found?
-      (log/warn "revision is unset, will initialize to 1"))
-    @(op/set tx rk (p/encode-revision rev))
+      (log/warn "revision is unset, will initialize to" rev))
+    (op/set tx rk (p/encode-revision rev))
     rev))
