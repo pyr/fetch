@@ -32,6 +32,13 @@
         (.createOrOpen txc path)
         (deref))))
 
+(defn remove-dir
+  [^TransactionContext txc path]
+  (let [path (mapv str (if (coll? path) path [path]))]
+    (-> (DirectoryLayer.)
+        (.removeIfExists txc path)
+        (deref))))
+
 (defn ^Subspace subdir
   [^TransactionContext txc ^DirectorySubspace dir path]
   @(.createOrOpen dir txc [(name path)]))
@@ -40,8 +47,8 @@
   "Creates a map of subspaces for the various data needed.
   All subspaces will be located in a FoundationDB *directory*,
   with the top-level name, and the etcd instance ID"
-  [db instance-id]
-  (let [dir (create-dir db ["etcd" instance-id])]
+  [db prefix instance-id]
+  (let [dir (create-dir db [prefix instance-id])]
     (reduce #(assoc %1 %2 (subdir db dir %2))
             {}
             [:keys :instances :watches :events :metadata :revision])))
@@ -50,13 +57,13 @@
   #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")
 
 (defn- component-start
-  [{::keys [cluster-file executor] :as fdb}]
+  [{:fetch.fdb/keys [cluster-file prefix executor] :as fdb}]
   (ex/assert-spec-valid ::config fdb)
   (let [db (open cluster-file executor)]
     (log/info "successfully opened connection to database")
     (assoc fdb
            ::database db
-           ::dirs (make-dirs db static-instance-id))))
+           ::dirs (make-dirs db prefix static-instance-id))))
 
 (defn- component-stop
   [{::keys [database] :as fdb}]
@@ -70,7 +77,8 @@
     {'com.stuartsierra.component/start component-start
      'com.stuartsierra.component/stop  component-stop}))
 
-(s/def ::executor (partial instance? Executor))
-(s/def ::cluster-file string?)
-(s/def ::config (s/keys :req [::cluster-file]
-                        :opt [::executor]))
+(s/def :fetch.fdb/executor (partial instance? Executor))
+(s/def :fetch.fdb/cluster-file string?)
+(s/def :fetch.fdb/prefix string?)
+(s/def ::config (s/keys :req [:fetch.fdb/cluster-file :fetch.fdb/prefix]
+                        :opt [:fetch.fdb/executor]))

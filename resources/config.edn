@@ -1,2 +1,3 @@
-{:fetch.fdb/cluster-file    "/etc/foundationdb/fdb.cluster"
- :fetch.grpc.server/port    8080}
+{:fetch.fdb/cluster-file "/etc/foundationdb/fdb.cluster"
+ :fetch.fdb/prefix       "etcd"
+ :fetch.grpc.server/port 8080}

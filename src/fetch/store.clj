@@ -5,7 +5,7 @@
   (create-if-absent [this key value lease])
   (update-at-revision [this key revision value lease])
   (count-keys [this prefix])
-  (range-keys [this revivision limit prefix])
+  (range-keys [this revision limit prefix])
   (get-at-revision [this key revision])
   (get-latest [this key])
   (delete-key [this key revision])

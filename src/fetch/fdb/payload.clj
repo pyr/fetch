@@ -42,14 +42,17 @@
     {:mod-revision rev
      :key          k}))
 
+(defn decode-value
+  [vba]
+  (let [[lease create-rev value] (some-> vba tuple/decode-and-expand)]
+    {:lease           lease
+     :create-revision create-rev
+     :value           value}))
+
 (defn decode-keyval
   [dirs kv]
-  (let [[kba vba]                (kv/as-tuple kv)
-        key-data                 (decode-key dirs kba)
-        [lease create-rev value] (some-> vba tuple/decode-and-expand)]
-    (merge key-data {:lease           lease
-                     :create-revision create-rev
-                     :value           value})))
+  (let [[kba vba] (kv/as-tuple kv)]
+    (merge (decode-key dirs kba) (decode-value vba))))
 
 (defn encode-val
   [lease-id create-revision value]

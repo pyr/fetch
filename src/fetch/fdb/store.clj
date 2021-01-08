@@ -14,35 +14,34 @@
     (if (some? previous)
       [(common/highest-revision tx dirs) false]
       (let [new-rev (common/increment-revision tx dirs)]
-        @(a/chain (op/set tx (p/key dirs key new-rev)
-                          (p/encode-val lease-id 0 value))
-                  (constantly [new-rev true])))) ))
+        (op/set tx (p/key dirs key new-rev)
+                (p/encode-val lease-id 0 value))
+        [new-rev true]))))
 
 (defn update-at-revision
   [tx dirs key revision value lease]
   (let [previous (common/previous tx dirs key)]
     (if (= revision (:mod-revision previous))
       (let [new-rev (common/increment-revision tx dirs)]
-        @(a/chain (op/set tx (p/key dirs key new-rev)
-                          (p/encode-val lease 0 value))
-                  (constantly [new-rev true])))
+        (op/set tx (p/key dirs key new-rev)
+                (p/encode-val lease 0 value))
+        [new-rev true])
       [(common/highest-revision tx dirs) false])))
 
 (defn count-keys
   [tx dirs prefix]
-  @(a/chain (op/reverse-range tx (p/key-range dirs prefix))
-            (fn [kvs]
-              [(common/highest-revision tx dirs)
-               (->> kvs
-                    (map kv/k)
-                    (map (partial p/decode-key dirs))
-                    (map :mod-revision)
-                    (distinct)
-                    (count))])))
+  (let [kvs (op/reverse-range tx (p/key-range dirs prefix))]
+    [(common/highest-revision tx dirs)
+     (->> kvs
+          (map kv/k)
+          (map (partial p/decode-key dirs))
+          (map :mod-revision)
+          (distinct)
+          (count))]))
 
 (defn range-keys
   [tx dirs revision limit prefix]
-  (->> @(op/reverse-range tx (p/key-range dirs prefix) limit)
+  (->> (op/reverse-range tx (p/key-range dirs prefix) limit)
        (map kv/k)
        (map (partial p/decode-key dirs))
        (partition-by :mod-revision)
@@ -51,8 +50,9 @@
 
 (defn get-at-revision
   [tx dirs key revision]
-  (some->> @(op/get tx (p/key dirs key revision))
-           (p/decode-keyval dirs)))
+  (some-> (op/get tx (p/key dirs key revision))
+          p/decode-value
+          (assoc :mod-revision revision :key key)))
 
 (defn get-latest
   [tx dirs key]
@@ -63,24 +63,24 @@
   (let [previous (common/previous tx dirs key)]
     (if (= revision (:mod-revision previous))
       (let [new-rev (common/increment-revision tx dirs)]
-        @(a/chain (op/clear-range tx (p/key-range dirs key))
-                  (constantly [new-rev true])))
+        (op/clear-range tx (p/key-range dirs key))
+        [new-rev true])
       [revision false])))
 
 (defn create-watch-instance
   [tx dirs instance]
   (let [rev (common/increment-revision tx dirs)]
-    @(op/set tx (p/watch-instance-key dirs instance) (p/encode-revision rev))))
+    (op/set tx (p/watch-instance-key dirs instance) (p/encode-revision rev))))
 
 (defn delete-watch-instance
   [tx dirs instance]
-  @(op/clear tx (p/watch-instance-key dirs instance))
-  @(op/clear tx (p/events-range dirs instance)))
+  (op/clear tx (p/watch-instance-key dirs instance))
+  (op/clear tx (p/events-range dirs instance)))
 
 (defn register-key-watch
   [tx dirs instance id prefix revision]
-  @(op/set tx (p/watch-key dirs prefix)
-           (p/encode-watch instance id revision)))
+  (op/set tx (p/watch-key dirs prefix)
+          (p/encode-watch instance id revision)))
 
 (defn cancel-key-watch
   [tx dirs instance id]
@@ -88,7 +88,7 @@
                                   op/range-no-limit false)
           :let [watch (p/decode-watch (kv/v kv))]
           :when (= [instance id] (take 2 watch))]
-    @(op/clear tx (kv/k kv))))
+    (op/clear tx (kv/k kv))))
 
 (defn register-watch-listener
   "Watch the notification key for this watcher's instance, only one key watched
@@ -103,11 +103,11 @@
              (db/run-in-transaction
               db
               (fn [tx _]
-                (let [results @(op/range-with-range tx events-key
-                                                    op/range-no-limit false)]
+                (let [results (op/range-with-range tx events-key
+                                                   op/range-no-limit false)]
                   ;; Let's clear events we're now reporting so as to not
                   ;; report them again to this watcher
-                  @(op/clear-range tx events-key)
+                  (op/clear-range tx events-key)
                   {:continue?       true
                    ;; XXX: need to better format here
                    :events-by-watch (group-by :watch-id results)}))))))
@@ -181,7 +181,19 @@
   handle
 
   store
-  (store/create-if-absent store "foo" (.getBytes "bar") 2)
+  (store/create-if-absent store "boo" (.getBytes "bar") 2)
+
+  (store/get-at-revision store "boo" 3)
+  (store/get-latest store "boo")
+
+
+  (store/count-keys store "foo")
+  (store/range-keys store 1 5 "bo")
+
+  (store/delete-key store "boo" 3)
   (p/encode-revision 1)
-  (db/run-in-transaction handle (fn [tx dirs] @(op/get tx (p/revision-key dirs))))
+
+  (db/run-in-transaction handle (fn [tx dirs] (let [rk (p/revision-key dirs) value (op/get tx rk)] value)))
+  (db/run-in-transaction handle common/increment-revision)
+  (db/run-in-transaction handle common/highest-revision)
   )

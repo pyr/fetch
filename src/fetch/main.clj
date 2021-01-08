@@ -13,7 +13,7 @@
 
 (def components
   "The full map of operators and managers"
-  {::fdb             (using fdb/handle    [::fdb/cluster-file])
+  {::fdb             (using fdb/handle    [::fdb/cluster-file ::fdb/prefix])
    ::store/engine    (using fdb/store {:db ::fdb})
    ::kv              (using kv/service [::store/engine])
    ::lease           lease/service

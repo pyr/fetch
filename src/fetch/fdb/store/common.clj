@@ -19,7 +19,9 @@
 
 (defn highest-revision
   [tx dirs]
-  (op/get tx (p/revision-key dirs)))
+  (some->> (p/revision-key dirs)
+           (op/get tx)
+           (p/decode-revision)))
 
 (defn increment-revision
   [tx dirs]

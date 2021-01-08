@@ -13,6 +13,7 @@
   :main fetch.main
   :jvm-opts ["-Dio.netty.tryReflectionSetAccessible=false"]
   :profiles {:dev     {:resource-paths ["test/resources"]
+                       :source-paths   ["dev"]
                        :jvm-opts       ["-Dlogback.configurationFile=stdout.logback.xml"]}
              :uberjar {:global-vars {*warn-on-reflection* true}
                        :aot         :all}}
