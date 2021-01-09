@@ -10,12 +10,7 @@
   [prefix]
   (Range/startsWith (tuple/encode-and-pack prefix)))
 
-(defn bounded
-  [begin end]
-  (Range. (tuple/encode-and-pack begin)
-          (tuple/encode-and-pack end)))
-
-(defn bounded-bytes
+(defn bounded-range
   [begin end]
   (Range. ^bytes begin ^bytes end))
 
@@ -53,18 +48,3 @@
 (defn from
   [dirs space & objs]
   (from-seq dirs space objs))
-
-(defn- inc-prefix
-  "Given an object path, yield the next semantic one."
-  [^String p]
-  (when (seq p)
-    (let [[c & s] (reverse p)]
-      (->> (-> c int inc char)
-           (conj s)
-           reverse
-           (reduce str "")))))
-
-(defn range-prefix
-  [dirs space prefix]
-  (bounded-bytes (from dirs space prefix)
-                 (from dirs space (inc-prefix prefix))))

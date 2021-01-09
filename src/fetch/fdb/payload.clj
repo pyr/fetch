@@ -31,9 +31,20 @@
 (defn key-range [dirs k]
   (space/range dirs :keys k))
 
+(defn- inc-prefix
+  "Given an object path, yield the next semantic one."
+  [^String p]
+  (when (seq p)
+    (let [[c & s] (reverse p)]
+      (->> (-> c int inc char)
+           (conj s)
+           reverse
+           (reduce str "")))))
 
-(defn key-prefix [dirs k]
-  (space/range-prefix dirs :keys k))
+(defn key-prefix
+  [dirs prefix]
+  (space/bounded-range (space/from dirs :keys prefix)
+                       (space/from dirs :keys (inc-prefix prefix))))
 
 (defn schema-key [dirs]
   (space/from dirs :schema))
