@@ -16,6 +16,7 @@
                        :source-paths   ["dev"]
                        :jvm-opts       ["-Dlogback.configurationFile=stdout.logback.xml"]}
              :uberjar {:global-vars {*warn-on-reflection* true}
+                       :jvm-opts ["-Dio.netty.tryReflectionSetAccessible=false"]
                        :aot         :all}}
   :repositories [["exoscale" {:url "https://artifacts.exoscale.ch"}]]
   :repl-options {:init-ns exoscale.fetch})

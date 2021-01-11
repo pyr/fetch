@@ -51,7 +51,7 @@
   [e]
   (let [e                                 (cond-> e
                                             (instance? CompletionException e)
-                                            .getCause)
+                                            (ex-cause))
         {:keys      [type]
          :grpc/keys [status description]} (ex-data e)
         description                       (or description (ex-message e))
@@ -62,7 +62,7 @@
                                               Status/UNKNOWN)]
     (when log?
       (log/error e (ex-message e)))
-    (.withDescription gstatus description)))
+    (.withDescription ^Status gstatus (str description))))
 
 (defn as-exception
   [^Status s]

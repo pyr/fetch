@@ -53,10 +53,6 @@
   ([^Tuple t index]
    (.getLong t (long index))))
 
-(defn unpack
-  [^Tuple t]
-  (.unpack t))
-
 (defn range
   [^Tuple t]
   (.range t))

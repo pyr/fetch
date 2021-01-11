@@ -2,7 +2,9 @@
   (:require [exoscale.ex           :as ex]
             [clojure.spec.alpha    :as s]
             [clojure.tools.logging :as log])
-  (:import io.grpc.netty.NettyServerBuilder
+  (:import io.grpc.BindableService
+           io.grpc.Server
+           io.grpc.netty.NettyServerBuilder
            java.net.InetSocketAddress
            java.util.concurrent.TimeUnit))
 
@@ -34,9 +36,9 @@
   (ex/assert-spec-valid ::config this)
   (let [addr (build-address host port)
         sb   (NettyServerBuilder/forAddress addr)]
-    (doseq [service (map (partial fetch-service this) services)]
+    (doseq [^BindableService service (map (partial fetch-service this) services)]
       (log/info "adding service:" service)
-      (.addService sb service))
+      (.addService ^NettyServerBuilder sb service))
     (let [server (-> sb .build .start)]
       (log/info "built and started server:" server)
       (assoc this ::server server))))
@@ -45,8 +47,8 @@
   [{::keys [server grace-period] :as this}]
   (log/info "shutting down server")
   (when (some? server)
-    (.shutdown server)
-    (.awaitTermination server (or grace-period 2000) TimeUnit/MILLISECONDS))
+    (.shutdown ^Server server)
+    (.awaitTermination ^Server server (or grace-period 2000) TimeUnit/MILLISECONDS))
   (log/info "server shutdown completed")
   (dissoc this ::server))
 

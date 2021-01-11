@@ -17,22 +17,27 @@
 
 (defn purge-directories
   [{::keys [fdb]}]
-  (db/run-in-transaction
-   fdb
-   (fn [tx dirs]
-     (doseq [[k d] dirs
-             :when (simple-keyword? k)]
-       (op/clear-range tx (space/subrange d))
-       (db/remove-dir tx d))
-     (op/clear-range tx (space/subrange (::db/instance dirs)))
-     (db/remove-dir tx (::db/instance dirs))
-     (op/clear-range tx (space/subrange (::db/top dirs)))
-     (db/remove-dir tx (::db/top dirs))))
-  (doseq [[k d] (-> fdb ::db/dirs)
-          :when (simple-keyword? k)]
-    (db/remove-dir (db/get-handle fdb) d))
-  (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/instance))
-  (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/top)))
+  ;; When things go wrong during local tests, it can be useful to have a way
+  ;; to inspect the values generated in the database.
+  (let [prevent-purge? (some? (or (System/getenv "FETCH_TEST_PREVENT_PURGE")
+                                  (System/getProperty "fetch.prevent-purge")))]
+    (when-not prevent-purge?
+      (db/run-in-transaction
+       fdb
+       (fn [tx dirs]
+         (doseq [[k d] dirs
+                 :when (simple-keyword? k)]
+           (op/clear-range tx (space/subrange d))
+           (db/remove-dir tx d))
+         (op/clear-range tx (space/subrange (::db/instance dirs)))
+         (db/remove-dir tx (::db/instance dirs))
+         (op/clear-range tx (space/subrange (::db/top dirs)))
+         (db/remove-dir tx (::db/top dirs))))
+      (doseq [[k d] (-> fdb ::db/dirs)
+              :when (simple-keyword? k)]
+        (db/remove-dir (db/get-handle fdb) d))
+      (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/instance))
+      (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/top)))))
 
 (def cleaner
   (with-meta {} {`component/stop purge-directories}))

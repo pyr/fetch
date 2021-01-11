@@ -4,6 +4,7 @@
             [clojure.spec.alpha         :as s]
             [com.stuartsierra.component :as component])
   (:import java.util.concurrent.ArrayBlockingQueue
+           java.util.concurrent.ExecutorService
            java.util.concurrent.Callable
            java.util.concurrent.TimeUnit
            java.util.concurrent.ThreadFactory
@@ -66,7 +67,8 @@
 
 (defn forcibly-shutdown-pool
   [pool config]
-  (let [grace-period (long (get-in config [:config :shutdown-grace-period] 2))]
+  (let [grace-period (long (get-in config [:config :shutdown-grace-period] 2))
+        pool         ^ExecutorService pool]
     (log/info "shutting pool down with grace period:" grace-period)
     (try
       (.shutdown pool)
