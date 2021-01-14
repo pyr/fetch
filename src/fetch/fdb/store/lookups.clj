@@ -29,8 +29,7 @@
   [{:keys [tx dirs key revision]}]
   (some-> (op/get tx (p/key dirs key revision))
           p/decode-value
-          (assoc :mod-revision revision :key key)
-          (dissoc :revision)))
+          (assoc :mod-revision revision :key key)))
 
 (defn get-latest
   "Find the latest version, we rely on the lookup-previous interceptor
