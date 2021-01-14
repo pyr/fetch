@@ -9,35 +9,26 @@
 
 (def ^:dynamic *store* nil)
 (def ^:dynamic *fdb* nil)
-(def ^:dynamic *lease* nil)
-(def ^:dynamic *watch* nil)
-(def ^:dynamic *kv* nil)
-(def ^:dynamic *server* nil)
-(def ^:dynamic *ports* nil)
 (def ^:dynamic *system* nil)
 
+(defn cluster-name
+  []
+  (or (System/getenv "FETCH_TEST_CLUSTER_NAME")
+      (System/getenv "fetch.test.cluster-name")
+      (str (java.util.UUID/randomUUID))))
+
 (defn purge-directories
-  [{::keys [fdb]}]
+  [{::keys [fdb cluster-name]}]
   ;; When things go wrong during local tests, it can be useful to have a way
   ;; to inspect the values generated in the database.
-  (let [prevent-purge? (some? (or (System/getenv "FETCH_TEST_PREVENT_PURGE")
-                                  (System/getProperty "fetch.prevent-purge")))]
+  (let [prevent-purge? (some?
+                        (or (System/getenv "FETCH_TEST_PREVENT_PURGE")
+                            (System/getProperty "fetch.test.prevent-purge")))
+        store          (store/namespaced fdb cluster-name)]
     (when-not prevent-purge?
-      (tx/write-transaction
-       fdb
-       (fn [tx dirs]
-         (doseq [[k d] dirs :when (simple-keyword? k)]
-           (op/clear-range tx (space/subrange d))
-           (db/remove-dir tx d))
-         (op/clear-range tx (space/subrange (::db/instance dirs)))
-         (db/remove-dir tx (::db/instance dirs))
-         (op/clear-range tx (space/subrange (::db/top dirs)))
-         (db/remove-dir tx (::db/top dirs))))
-      (doseq [[k d] (-> fdb ::db/dirs)
-              :when (simple-keyword? k)]
-        (db/remove-dir (db/get-handle fdb) d))
-      (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/instance))
-      (db/remove-dir (db/get-handle fdb) (-> fdb ::db/dirs ::db/top)))))
+      ;; XXX: purge created directories
+      :nothing
+      )))
 
 (def cleaner
   (with-meta {} {`component/stop purge-directories}))
@@ -46,22 +37,18 @@
   []
   {::fdb/cluster-file "/etc/foundationdb/fdb.cluster"
    ::fdb/prefix       (name (gensym "test-etcd"))
+   ::cluster-name     (cluster-name)
    ::fdb              (using fdb/handle [::fdb/cluster-file ::fdb/prefix])
    ::cleaner          (using cleaner [::fdb])})
 
 (defn wrap-system-fn
   [sys]
   (fn [f]
-    (let [started (component/start-system (into (component/system-map) (sys)))
-          uuid    (java.util.UUID/randomUUID)]
+    (let [started (component/start-system (into (component/system-map) (sys)))]
       (binding [*system* started
-                *store*  (store/prefixed (str uuid)  (::fdb started))
-                *fdb*    (::fdb started)
-                *lease*  (::lease started)
-                *watch*  (::watch started)
-                *kv*     (::kv started)
-                *server* (::server started)
-                *ports*  {}]
+                *store*  (store/namespaced (::fdb started)
+                                           (::cluster-name started))
+                *fdb*    (::fdb started)]
         (try (f) (finally (component/stop-system started)))))))
 
 

@@ -7,13 +7,13 @@
 (defn count-keys
   [{:keys [tx dirs prefix]}]
   (let [kvs (op/reverse-range tx (p/key-range dirs prefix))]
-    [(common/highest-revision tx dirs)
-     (->> kvs
-          (map kv/k)
-          (map (partial p/decode-key dirs))
-          (map :key)
-          (distinct)
-          (count))]))
+    {:revision (common/highest-revision tx dirs)
+     :result   (->> kvs
+                    (map kv/k)
+                    (map (partial p/decode-key dirs))
+                    (map :key)
+                    (distinct)
+                    (count))}))
 
 (defn range-keys
   [{:keys [tx dirs revision limit prefix]}]
@@ -29,10 +29,11 @@
   [{:keys [tx dirs key revision]}]
   (some-> (op/get tx (p/key dirs key revision))
           p/decode-value
-          (assoc :mod-revision revision :key key)))
+          (assoc :mod-revision revision :key key)
+          (dissoc :revision)))
 
 (defn get-latest
   "Find the latest version, we rely on the lookup-previous interceptor
    which already did the work for us"
-  [{:keys [previous previous?] :as ctx}]
-  (assoc ctx :result previous :success? previous?))
+  [{:keys [previous] :as ctx}]
+  (assoc ctx :result previous))

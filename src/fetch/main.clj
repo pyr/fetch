@@ -14,7 +14,7 @@
 
 (def components
   "The full map of operators and managers"
-  {::fdb             (using fdb/handle  [::fdb/cluster-file ::fdb/prefix])
+  {::fdb             (using fdb/handle [::fdb/cluster-file ::fdb/prefix])
    ::kv              kv/service
    ::lease           lease/service
    ::watch           watch/service
@@ -49,15 +49,3 @@
 ;; Configuration specs
 ;; ===================
 (s/def ::config (s/keys))
-
-(comment
-
-  (require '[aero.core :as aero])
-
-  (def sys
-    (build-system
-     (aero/read-config "resources/config.edn")))
-
-  (def sys (component/start-system sys))
-
-  (def sys (component/stop-system sys)))

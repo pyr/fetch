@@ -1,7 +1,9 @@
 (ns fetch.fdb.db
-  (:require [exoscale.ex           :as ex]
-            [fetch.fdb.store       :as store]
-            [clojure.spec.alpha    :as s])
+  (:require [exoscale.ex                :as ex]
+            [com.stuartsierra.component :as component]
+            [fetch.store                :as store]
+            [fetch.fdb.store            :as fstore]
+            [clojure.spec.alpha         :as s])
   (:import com.apple.foundationdb.Database
            com.apple.foundationdb.FDB
            com.apple.foundationdb.TransactionContext
@@ -49,34 +51,30 @@
             {::top topdir ::instance instancedir}
             [:keys :instances :watches :events :metadata])))
 
-(defn top-dir
-  [db]
-  (some-> db ::dirs ::top))
+(def top-dir
+  (comp ::top ::dirs))
 
-(defn get-handle
-  [db]
-  (::database db))
+(def get-handle
+  ::database)
 
-(defn- component-start
-  [{:fetch.fdb/keys [cluster-file prefix executor] :as fdb}]
-  (ex/assert-spec-valid ::config fdb)
-  (let [db (open cluster-file executor)]
-    (with-meta
-      (assoc fdb ::database db)
-      (merge (meta fdb)
-             {`store/prefixed #(assoc %1 ::dirs (make-dirs db prefix %2))}))))
+(defrecord DatabaseHandle []
+  component/Lifecycle
+  (start [this]
+    (let [{:fetch.fdb/keys [cluster-file executor]} this]
+      (ex/assert-spec-valid ::config this)
+      (assoc this ::database (open cluster-file executor))))
+  (stop [this]
+    (when-some [db (::database this)]
+      (close db))
+    (dissoc this ::database))
+  store/StorageEngineFactory
+  (namespaced [this ns]
+    (fstore/->FDBStoreEngine
+     (assoc this ::dirs (make-dirs (::database this)
+                                   (:fetch.fdb/prefix this)
+                                   ns)))))
 
-(defn- component-stop
-  [{::keys [database] :as fdb}]
-  (when (some? database)
-    (close database))
-  (dissoc fdb ::database ::dirs))
-
-(defn make-database
-  [opts]
-  (with-meta opts
-    {'com.stuartsierra.component/start component-start
-     'com.stuartsierra.component/stop  component-stop}))
+(def make-database #'map->DatabaseHandle)
 
 (s/def :fetch.fdb/executor (partial instance? Executor))
 (s/def :fetch.fdb/cluster-file string?)

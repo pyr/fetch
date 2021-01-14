@@ -17,5 +17,4 @@
   (register-watch-listener [this instance]))
 
 (defprotocol StorageEngineFactory ;; I could not resist :-)
-  :extend-via-metadata true
-  (prefixed [this prefix]))
+  (namespaced [this prefix]))

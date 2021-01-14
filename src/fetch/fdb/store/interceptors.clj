@@ -15,16 +15,17 @@
   "Check for successful mutation in a payload"
   (every-pred :mutation? :success?))
 
+(def final
+  {:name  :final
+   :leave #(select-keys % [:result :success? :revision])})
+
 (def lookup-previous
   "When `:lookup?` is set in the payload, fetch the last known version
    of `key`."
   {:name :lookup-previous
    :enter (-> (fn [{:keys [tx dirs key] :as ctx}]
-                (let [previous (common/previous tx dirs key)]
-                  (cond-> ctx
-                    (some? previous)
-                    (assoc :previous previous :previous? true))))
-              (ix/when :lookup?))})
+                (assoc ctx :previous (common/previous tx dirs key)))
+              (ix/when (comp some? :key)))})
 
 (def byte-counter
   "When a mutation has successfully ran, adapt the current cluster's byte count"
@@ -61,23 +62,21 @@
 (def error-report
   {:name :error-report})
 
-(def write-chain
-  [record-timing error-report lookup-previous
-   byte-counter watch-update event-publisher])
-
-(def read-chain
-  [error-report])
-
 (defn write!
   [db name handler params]
   (tx/write-transaction
    db
-   (fn [tx dirs] (ix/execute (conj write-chain {:name name :enter handler})
-                             (merge params {:op name :tx tx :dirs dirs})))))
+   (fn [tx dirs]
+     (ix/execute (merge params {:op name :tx tx :dirs dirs})
+                 [final record-timing error-report lookup-previous
+                  byte-counter watch-update event-publisher
+                  {:name name :enter handler}]))))
 
 (defn read
   [db name handler params]
   (tx/write-transaction
    db
-   (fn [tx dirs] (ix/execute (conj read-chain {:name name :enter handler})
-                             (merge params {:op name :tx tx :dirs dirs})))))
+   (fn [tx dirs]
+     (ix/execute (merge params {:op name :tx tx :dirs dirs})
+                 [final error-report lookup-previous
+                  {:name name :enter handler}]))))

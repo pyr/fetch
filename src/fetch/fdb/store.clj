@@ -7,13 +7,12 @@
             [fetch.fdb.store.interceptors :as ix]
             [fetch.fdb.store.watches      :as watches]))
 
-(defrecord FDBStoreEngine [db dirs]
+(defrecord FDBStoreEngine [db]
   store/StorageEngine
   ;; Mutations
   ;; =========
   (create-if-absent [_ key value lease]
     (ix/write! db :create mutations/create-if-absent {:key       key
-                                                      :lookup?   true
                                                       :mutation? true
                                                       :value     value
                                                       :lease     lease}))
@@ -31,19 +30,17 @@
   ;; Lookups
   ;; =======
   (count-keys [_ prefix]
-    (ix/read db :count (ix/out lookups/count-keys [:count]) {:prefix prefix}))
+    (ix/read db :count lookups/count-keys {:prefix prefix}))
   (range-keys [_ revision limit prefix]
-    (ix/read db :range (ix/out lookups/range-keys [:range]) {:revision revision
-                                                             :limit    limit
-                                                             :prefix   prefix}))
+    (ix/read db :range (ix/out lookups/range-keys [:result]) {:revision revision
+                                                              :limit    limit
+                                                              :prefix   prefix}))
   (get-at-revision [_ key revision]
     (ix/read db :get (ix/out lookups/get-at-revision [:result])
              {:key      key
-              :lookup?  true
               :revision revision}))
   (get-latest [_ key]
-    (ix/read db :get-latest lookups/get-latest {:key     key
-                                                :lookup? true}))
+    (ix/read db :get-latest lookups/get-latest {:key key}))
 
   ;; Watches
   ;; =======

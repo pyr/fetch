@@ -12,27 +12,33 @@
            io.grpc.ServerCall$Listener
            java.util.List))
 
-(defn make-auth-interceptor
-  "Build the auth interception function."
-  [factory]
+(defn make-interceptor
+  [f]
   (reify ServerInterceptor
     (interceptCall [this call headers next]
       (try
-        (let [principal (some-> call
-                                .getAttributes
-                                (.get Grpc/TRANSPORT_ATTR_SSL_SESSION)
-                                (.getPeerPrincipal)
-                                (.getName)
-                                (str))]
-          (when (nil? principal)
-            (ex/ex-forbidden! "invalid TLS session, cannot retrieve principal"))
-          (ctx/intercept (ctx/with-engine (store/prefixed factory principal))
-                         call
-                         headers
-                         next))
+        (f call headers next)
         (catch Exception e
           (.close call (.withCause (status/ex->status e) e))
           (proxy [ServerCall$Listener] []))))))
+
+(defn make-auth-interceptor
+  "Build the auth interception function."
+  [factory]
+  (make-interceptor
+   (fn [call headers next]
+     (let [principal (some-> call
+                             .getAttributes
+                             (.get Grpc/TRANSPORT_ATTR_SSL_SESSION)
+                             (.getPeerPrincipal)
+                             (.getName)
+                             (str))]
+          (when (nil? principal)
+            (ex/ex-forbidden! "invalid TLS session, cannot retrieve principal"))
+          (ctx/intercept (ctx/with-engine (store/namespaced factory principal))
+                         call
+                         headers
+                         next)))))
 
 (defn make-service
   "Wrap a service in an interceptor"

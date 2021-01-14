@@ -12,7 +12,7 @@
 
 (defmulti create-if-absent
   "Create a key unless a previous revision exists for it"
-  :previous?)
+  (comp some? :previous))
 
 (defmethod create-if-absent true
   [{:keys [tx dirs] :as ctx}]
@@ -28,12 +28,12 @@
 (defmulti update-at-revision
   "Essentially a compare and set operation. Dispatches on the state of the
    previous key"
-  (fn [{:keys [previous? revision previous]}]
+  (fn [{:keys [revision previous]}]
     (let [old-revision (:mod-revision previous)]
       (cond
-        (zero? revision)                                  :force-put
-        (and (true? previous?) (= revision old-revision)) :force-put
-        :else                                             :absent))))
+        (zero? revision)                                 :force-put
+        (and (some? previous) (= revision old-revision)) :force-put
+        :else                                            :bad-revision))))
 
 (defmethod update-at-revision :force-put
   [{:keys [tx dirs key value lease] :as ctx}]
@@ -48,13 +48,13 @@
 (defmulti delete-key
   "A compare and set operation specific to deletes. Dispatches
    on the state of the previous key"
-  (fn [{:keys [previous? revision previous]}]
+  (fn [{:keys [revision previous]}]
     (let [old-revision (:mod-revision previous)]
       (cond
-        (zero? revision)                                  :force-delete
-        (and (true? previous?) (= revision old-revision)) :force-delete
-        (true? previous?)                                 :bad-revision
-        :else                                             :absent))))
+        (zero? revision)                                 :force-delete
+        (and (some? previous) (= revision old-revision)) :force-delete
+        (some? previous)                                 :bad-revision
+        :else                                            :absent))))
 
 (defmethod delete-key :force-delete
   [{:keys [tx dirs key] :as ctx}]
