@@ -22,9 +22,13 @@
   [^Database db]
   (.close db))
 
-(defn run-in-transaction
+(defn write-transaction
   [this f]
   (.run ^Database (::database this) (fn/wrap #(f % (::dirs this)))))
+
+(defn read-transaction
+  [this f]
+  (.read ^Database (::database this) (fn/wrap #(f % (::dirs this)))))
 
 (defn create-dir
   [^TransactionContext txc path]
@@ -52,7 +56,7 @@
         instancedir (create-dir db [prefix instance-id])]
     (reduce #(assoc %1 %2 (subdir db instancedir %2))
             {::top topdir ::instance instancedir}
-            [:keys :instances :watches :events :metadata :revision])))
+            [:keys :instances :watches :events :metadata])))
 
 (defn top-dir
   [db]

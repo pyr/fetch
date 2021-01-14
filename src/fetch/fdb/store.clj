@@ -1,35 +1,66 @@
 (ns fetch.fdb.store
-  (:require [fetch.store            :as store]
-            [fetch.fdb.store.common :as common]
-            [fetch.fdb.db           :as db]
-            [fetch.fdb.op           :as op]
-            [fetch.fdb.kv           :as kv]
-            [fetch.fdb.payload      :as p]
-            [qbits.auspex           :as a]))
+  "Implementations of the `fetch.store/StorageEngine` protocol against
+   FoundationDB"
+  (:require [fetch.store                  :as store]
+            [fetch.fdb.store.common       :as common]
+            [fetch.fdb.store.interceptors :as ix]
+            [fetch.fdb.db                 :as db]
+            [fetch.fdb.op                 :as op]
+            [fetch.fdb.kv                 :as kv]
+            [fetch.fdb.payload            :as p]
+            [qbits.auspex                 :as a]))
 
-(defn create-if-absent
-  [tx dirs key value lease]
-  (let [previous (common/previous tx dirs key)
-        lease-id (if (some? lease) lease 0)]
-    (if (some? previous)
-      [(common/highest-revision tx dirs) false]
-      (let [new-rev (common/increment-revision tx dirs)]
-        (op/set tx (p/key dirs key new-rev)
-                (p/encode-val lease-id 0 value))
-        [new-rev true]))))
+(defmulti create-if-absent
+  "Create a key unless a previous revision exists for it"
+  (comp some? :previous?))
 
-(defn update-at-revision
-  [tx dirs key revision value lease]
-  (let [previous (common/previous tx dirs key)]
-    (if (= revision (:mod-revision previous))
-      (let [new-rev (common/increment-revision tx dirs)]
-        (op/set tx (p/key dirs key new-rev)
-                (p/encode-val lease 0 value))
-        [new-rev true])
-      [(common/highest-revision tx dirs) false])))
+(defmethod create-if-absent true
+  [{:keys [tx dirs] :as ctx}]
+  (assoc ctx :success? false :revision (common/highest-revision tx dirs)))
+
+(defmethod create-if-absent false
+  [{:keys [tx dirs key value lease] :as ctx}]
+  (let [lease-id (or lease 0)
+        revision (common/increment-revision tx dirs)]
+    (op/set tx (p/key dirs key revision) (p/encode-val lease-id 0 value))
+    (assoc ctx :success? true :revision revision :lease lease-id)))
+
+(defmulti update-at-revision
+  "Essentially a compare and set operation"
+  (comp some? :previous?))
+
+(defmethod update-at-revision true
+  [{:keys [tx dirs key revision value lease previous] :as ctx}]
+  (if (= revision (:mod-revision previous))
+    (let [new-rev (common/increment-revision tx dirs)]
+      (op/set tx (p/key dirs key new-rev)
+              (p/encode-val lease 0 value))
+      (assoc ctx :revision new-rev :success? true))
+    (assoc ctx :revision (common/highest-revision tx dirs) :success? false)))
+
+(defmethod update-at-revision false
+  [ctx]
+  (assoc ctx :success? false))
+
+(defmulti delete-key
+  "A compare and set operation specific to deletes"
+  (comp some? :previous?))
+
+(defmethod delete-key true
+  [{:keys [tx dirs key revision value lease previous] :as ctx}]
+  (if (= revision (:mod-revision previous))
+    (let [new-rev (common/increment-revision tx dirs)]
+      (op/set tx (p/key dirs key new-rev)
+              (p/encode-val lease 0 value))
+      (assoc ctx :revision new-rev :success? true))
+    (assoc ctx :revision (common/highest-revision tx dirs) :success? false)))
+
+(defmethod delete-key false
+  [ctx]
+  (assoc ctx :success? false))
 
 (defn count-keys
-  [tx dirs prefix]
+  [{:keys [tx dirs prefix]}]
   (let [kvs (op/reverse-range tx (p/key-range dirs prefix))]
     [(common/highest-revision tx dirs)
      (->> kvs
@@ -40,7 +71,7 @@
           (count))]))
 
 (defn range-keys
-  [tx dirs revision limit prefix]
+  [{:keys [tx dirs revision limit prefix]}]
   (let [range (p/key-prefix dirs prefix)]
     (->> (op/reverse-range tx range limit)
          (map kv/k)
@@ -50,23 +81,17 @@
          (filter #(>= (:mod-revision %) revision)))))
 
 (defn get-at-revision
-  [tx dirs key revision]
+  [{:keys [tx dirs key revision]}]
   (some-> (op/get tx (p/key dirs key revision))
           p/decode-value
           (assoc :mod-revision revision :key key)))
 
 (defn get-latest
-  [tx dirs key]
-  (common/previous tx dirs key))
+  "Find the latest version, we rely on the lookup-previous interceptor
+   which already did the work for us"
+  [{:keys [previous previous?] :as ctx}]
+  (assoc ctx :result previous :success? previous?))
 
-(defn delete-key
-  [tx dirs key revision]
-  (let [previous (common/previous tx dirs key)]
-    (if (= revision (:mod-revision previous))
-      (let [new-rev (common/increment-revision tx dirs)]
-        (op/clear-range tx (p/key-range dirs key))
-        [new-rev true])
-      [revision false])))
 
 (defn create-watch-instance
   [tx dirs instance]
@@ -91,7 +116,7 @@
           :when (= [instance id] (take 2 watch))]
     (op/clear tx (kv/k kv))))
 
-(defn register-watch-listener
+(defn register-listener
   "Watch the notification key for this watcher's instance, only one key watched
    per connection to etcd.
 
@@ -101,7 +126,7 @@
   (let [instance-key (p/watch-instance-key dirs instance)
         events-key   (p/events-range dirs instance)]
     (a/chain (op/watch tx instance-key)
-             (db/run-in-transaction
+             (db/write-transaction
               db
               (fn [tx _]
                 (let [results (op/range-with-range tx events-key
@@ -113,88 +138,50 @@
                    ;; XXX: need to better format here
                    :events-by-watch (group-by :watch-id results)}))))))
 
+
 (defrecord FDBStoreEngine [db]
   store/StorageEngine
   (create-if-absent [_ key value lease]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (create-if-absent tx dirs key value lease))))
+    (ix/write! db :create create-if-absent {:key       key
+                                            :lookup?   true
+                                            :mutation? true
+                                            :value     value
+                                            :lease     lease}))
   (update-at-revision [_ key revision value lease]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (update-at-revision tx dirs key revision
-                                                 value lease))))
+    (ix/write! db :update update-at-revision {:key       key
+                                              :mutation? true
+                                              :value     value
+                                              :revision  revision
+                                              :lease     lease}))
+    (delete-key [_ key revision]
+      (ix/write! db :delete delete-key {:key       key
+                                        :revision  revision
+                                        :mutation? true}))
+
   (count-keys [_ prefix]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (count-keys tx dirs prefix))))
+    (ix/read db :count (ix/out count-keys [:count]) {:prefix prefix}))
   (range-keys [_ revision limit prefix]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (range-keys tx dirs revision limit prefix))))
+    (ix/read db :range (ix/out range-keys [:range]) {:revision revision
+                                                     :limit    limit
+                                                     :prefix   prefix}))
   (get-at-revision [_ key revision]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (get-at-revision tx dirs key revision))))
+    (ix/read db :get (ix/out get-at-revision [:result]) {:key      key
+                                                         :lookup?  true
+                                                         :revision revision}))
   (get-latest [_ key]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (get-latest tx dirs key))))
-  (delete-key [_ key revision]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (delete-key tx dirs key revision))))
+    (ix/read db :get-latest get-latest {:key     key
+                                        :lookup? true}))
   (create-watch-instance [_ instance]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (create-watch-instance tx dirs instance))))
+    (ix/write! db :create-instance create-watch-instance {:instance instance}))
   (delete-watch-instance [_ instance]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (delete-watch-instance tx dirs instance))))
+    (ix/write! db :delete-instance delete-watch-instance {:instance instance}))
   (register-key-watch [_ instance id prefix revision]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (register-key-watch tx dirs instance id
-                                                 prefix revision))))
+    (ix/write! db :register-watch register-key-watch {:instance instance
+                                                      :prefix   prefix
+                                                      :revision revision
+                                                      :id       id}))
   (cancel-key-watch [_ instance id]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (cancel-key-watch tx dirs instance id))))
-  (register-watch-listener [_ instance]
-    (db/run-in-transaction db
-                           (fn [tx dirs]
-                             (register-watch-listener db tx dirs instance)))))
-
-(comment
-  (require '[com.stuartsierra.component :as component]
-           '[fetch.fdb.op :as op]
-           '[fetch.fdb.db :as db]
-           '[fetch.fdb.payload :as p]
-           '[fetch.fdb.kv :as kv])
-
-  (def handle
-    (component/start
-     (db/make-database {::db/cluster-file "/etc/foundationdb/fdb.cluster"})))
-
-  (def store (component/start (map->FDBStoreEngine {:db handle})))
-
-  handle
-
-  store
-  (store/create-if-absent store "boo" (.getBytes "bar") 2)
-
-  (store/get-at-revision store "boo" 3)
-  (store/get-latest store "boo")
-
-
-  (store/count-keys store "foo")
-  (store/range-keys store 1 5 "bo")
-
-  (store/delete-key store "boo" 3)
-  (p/encode-revision 1)
-
-  (db/run-in-transaction handle (fn [tx dirs] (let [rk (p/revision-key dirs) value (op/get tx rk)] value)))
-  (db/run-in-transaction handle common/increment-revision)
-  (db/run-in-transaction handle common/highest-revision)
-  )
+    (ix/write! db :cancel-watch register-key-watch {:instance instance
+                                                    :id       id}))
+  (register-watch-listener [_ i]
+    (ix/write! db :register-listener register-listener {:instance i})))

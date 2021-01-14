@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [get set])
   (:import com.apple.foundationdb.Range
            com.apple.foundationdb.ReadTransaction
+           com.apple.foundationdb.MutationType
            com.apple.foundationdb.Transaction))
 
 (defn get
@@ -11,6 +12,16 @@
 (defn set
   [^Transaction tr ^bytes k ^bytes v]
   (.set tr k v))
+
+(defn ^MutationType mutate-op
+  [op]
+  (cond
+    (instance? MutationType op) op
+    (= :add op)                 MutationType/ADD))
+
+(defn mutate
+  [^Transaction tr op ^bytes k ^bytes param]
+  (.mutate tr (mutate-op op) k param))
 
 (defn clear
   [^Transaction tr ^bytes k]
@@ -29,9 +40,9 @@
        (.asList)
        (deref))))
 
-#_(defn range-with-boundaries
-  ([^ReadTransaction tr begin end reverse?]
-   (.range tr begin end reverse?)))
+(defn approximate-size
+  [^Transaction tx]
+  @(.getApproximateSize tx))
 
 (defn reverse-range
   ([tx range]

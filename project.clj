@@ -9,7 +9,8 @@
                  [io.grpc/grpc-netty        "1.34.1"]
                  [io.grpc/grpc-core         "1.34.1"]
                  [io.grpc/grpc-api          "1.34.1"]
-                 [exoscale/mania            "0.1.306"]]
+                 [exoscale/mania            "0.1.306"]
+                 [exoscale/interceptor      "0.1.9"]]
   :main fetch.main
   :jvm-opts ["-Dio.netty.tryReflectionSetAccessible=false"]
   :profiles {:dev     {:resource-paths ["test/resources"]

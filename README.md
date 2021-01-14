@@ -141,6 +141,39 @@ in some ways and they share a number of common compromises.
 
 https://github.com/k3s-io/kine/
 
+### Reading notes
+
+The source file tree reflects the above split.
+
+```
+src
+└── fetch
+    ├── fdb.clj                    ;; The FoundationDB client code
+    ├── fdb
+    │   ├── db.clj
+    │   ├── fn.clj
+    │   ├── kv.clj
+    │   ├── op.clj
+    │   ├── payload.clj           ;; payload conversion
+    │   ├── space.clj
+    │   ├── tuple.clj
+    │   ├── store.clj             ;; FoundationDB storage engine
+    │   ├── store
+    │   │   ├── common.clj
+    │   │   └── interceptors.clj
+    ├── grpc                       ;; GRPC code
+    │   ├── server.clj            ;; GRPC server
+    │   ├── kv.clj                ;; GRPC services (kv, lease, watch)
+    │   ├── lease.clj
+    │   └── watch.clj
+    │   ├── status.clj            ;; exoscale/ex to GRPC status conversion
+    │   ├── stream.clj
+    │   ├── types.clj
+    ├── main.clj
+    ├── pool.clj
+    ├── store.clj
+    └── watcher.clj
+```
 
 ### Changelog
 
@@ -148,6 +181,8 @@ https://github.com/k3s-io/kine/
 
 ### Architecture Decision Records
 
+- [ADR006: GRPC interceptor to perform TLS authorization](docs/adrs/adr006.md)
+- [ADR005: Operations run through an interceptor chain](docs/adrs/adr005.md)
 - [ADR004: Implementing the kubernetes subset only](docs/adrs/adr004.md)
 - [ADR003: Treating all keys as strings](docs/adrs/adr003.md)
 - [ADR002: External artifact for GRPC definitions](docs/adrs/adr002.md)

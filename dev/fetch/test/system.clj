@@ -22,11 +22,10 @@
   (let [prevent-purge? (some? (or (System/getenv "FETCH_TEST_PREVENT_PURGE")
                                   (System/getProperty "fetch.prevent-purge")))]
     (when-not prevent-purge?
-      (db/run-in-transaction
+      (db/write-transaction
        fdb
        (fn [tx dirs]
-         (doseq [[k d] dirs
-                 :when (simple-keyword? k)]
+         (doseq [[k d] dirs :when (simple-keyword? k)]
            (op/clear-range tx (space/subrange d))
            (db/remove-dir tx d))
          (op/clear-range tx (space/subrange (::db/instance dirs)))

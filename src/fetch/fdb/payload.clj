@@ -11,13 +11,18 @@
 
 (defn revision-key
   [dirs]
-  (space/from dirs :revision))
+  (space/from dirs :metadata "r"))
 
-(defn encode-revision
+(defn byte-count-key
+  [dirs]
+  (space/from dirs :metadata "b"))
+
+(defn encode-long
   [revision]
   (tuple/pack-vals revision))
 
-(defn decode-revision
+(defn decode-long
+
   [ba]
   (some-> ba tuple/decode tuple/get-long))
 
