@@ -12,20 +12,17 @@
   ;; Mutations
   ;; =========
   (create-if-absent [_ key value lease]
-    (ix/write! db :create mutations/create-if-absent {:key       key
-                                                      :mutation? true
-                                                      :value     value
-                                                      :lease     lease}))
+    (ix/mutate! db :create mutations/create-if-absent {:key   key
+                                                       :value value
+                                                       :lease lease}))
   (update-at-revision [_ key revision value lease]
-    (ix/write! db :update mutations/update-at-revision {:key       key
-                                                        :mutation? true
-                                                        :value     value
-                                                        :revision  revision
-                                                        :lease     lease}))
+    (ix/mutate! db :update mutations/update-at-revision {:key      key
+                                                         :value    value
+                                                         :revision revision
+                                                         :lease    lease}))
   (delete-key [_ key revision]
-    (ix/write! db :delete mutations/delete-key {:key       key
-                                                :revision  revision
-                                                :mutation? true}))
+    (ix/mutate! db :delete mutations/delete-key {:key       key
+                                                 :revision  revision}))
 
   ;; Lookups
   ;; =======
@@ -33,8 +30,8 @@
     (ix/read db :count lookups/count-keys {:prefix prefix}))
   (range-keys [_ revision limit prefix]
     (ix/read db :range (ix/out lookups/range-keys [:result]) {:revision revision
-                                                              :limit    limit
-                                                              :prefix   prefix}))
+                                                              :prefix   prefix
+                                                              :limit    limit}))
   (get-at-revision [_ key revision]
     (ix/read db :get (ix/out lookups/get-at-revision [:result])
              {:key      key

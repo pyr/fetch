@@ -33,7 +33,7 @@
    :leave (-> (fn [{:keys [tx dirs op value]}]
                 (let [bc (cond-> (count (seq value)) (= op :delete) (* -1))]
                   (common/update-usage tx dirs bc)))
-              (ix/when successful-mutation?)
+              (ix/when :success?)
               (ix/discard))})
 
 (def event-publisher
@@ -41,7 +41,7 @@
   {:name :event-publisher
    :leave (-> (fn [{:keys [tx dirs key value op]}]
                 (common/add-event tx dirs {:op op :key key :value value}))
-              (ix/when successful-mutation?)
+              (ix/when :success?)
               (ix/discard))})
 
 (def watch-update
@@ -51,7 +51,7 @@
    :leave (-> (fn [{:keys [tx dirs key]}]
                 (run! (partial common/signal-watch tx dirs)
                       (common/find-watches tx dirs key)))
-              (ix/when successful-mutation?)
+              (ix/when :success?)
               (ix/discard))})
 
 (def record-timing
@@ -61,6 +61,16 @@
 
 (def error-report
   {:name :error-report})
+
+(defn mutate!
+  [db name handler params]
+  (tx/write-transaction
+   db
+   (fn [tx dirs]
+     (ix/execute (merge params {:op name :tx tx :dirs dirs})
+                 [final record-timing error-report lookup-previous
+                  byte-counter watch-update event-publisher
+                  {:name name :enter handler}]))))
 
 (defn write!
   [db name handler params]
