@@ -1,8 +1,8 @@
 (ns fetch.grpc.watch
-  (:require [fetch.grpc.stream :as stream]
-            [fetch.grpc.types  :as types]
-            [fetch.store       :as store]
-            [fetch.watcher     :as watcher])
+  (:require [fetch.grpc.stream      :as stream]
+            [fetch.grpc.types       :as types]
+            [fetch.grpc.context     :as ctx]
+            [fetch.watcher          :as watcher])
   (:import exoscale.etcd.api.WatchGrpc$WatchImplBase))
 
 (defmulti handle-request (fn [_ {:keys [type]}] type))
@@ -49,12 +49,12 @@
      (watcher/stop-watcher watcher))))
 
 (defn- make-service
-  [{::store/keys [engine]}]
+  [_]
   (proxy [WatchGrpc$WatchImplBase] []
     (watch [resp]
       (let [notifier  #(stream/on-next resp (types/map->watch-response %))
             publisher (make-publisher notifier)
-            watcher   (watcher/make-watcher engine publisher)]
+            watcher   (watcher/make-watcher (ctx/engine) publisher)]
         (make-observer watcher publisher resp)))))
 
 (def service

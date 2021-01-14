@@ -3,27 +3,31 @@
             [exoscale.mania             :as mania]
             [clojure.tools.logging      :as log]
             [clojure.spec.alpha         :as s]
-            [fetch.store                :as store]
             [fetch.fdb                  :as fdb]
+            [fetch.store                :as store]
             [fetch.grpc.kv              :as kv]
             [fetch.grpc.lease           :as lease]
             [fetch.grpc.watch           :as watch]
+            [fetch.grpc.auth            :as auth]
             [fetch.grpc.server          :as server])
   (:gen-class))
 
 (def components
   "The full map of operators and managers"
-  {::fdb             (using fdb/handle    [::fdb/cluster-file ::fdb/prefix])
-   ::store/engine    (using fdb/store {:db ::fdb})
-   ::kv              (using kv/service [::store/engine])
+  {::fdb             (using fdb/handle  [::fdb/cluster-file ::fdb/prefix])
+   ::kv              kv/service
    ::lease           lease/service
-   ::watch           (using watch/service [::store/engine])
-   ::server/services [::kv ::lease ::watch]
+   ::watch           watch/service
+   ::auth/kv         (using auth/service {::store/factory  ::fdb
+                                          ::server/service ::kv})
+   ::auth/watch      (using auth/service {::store/factory  ::fdb
+                                          ::server/service ::kv})
+   ::server/services [::auth/kv ::lease ::auth/watch]
    ::server          (using server/server [::server/services
                                            ::server/port
-                                           ::kv
+                                           ::auth/kv
                                            ::lease
-                                           ::watch])})
+                                           ::auth/watch])})
 
 (defn build-system
   "We build a system map by merging the provided configuration

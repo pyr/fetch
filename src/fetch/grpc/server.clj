@@ -36,9 +36,9 @@
   (ex/assert-spec-valid ::config this)
   (let [addr (build-address host port)
         sb   (NettyServerBuilder/forAddress addr)]
-    (doseq [^BindableService service (map (partial fetch-service this) services)]
-      (log/info "adding service:" service)
-      (.addService ^NettyServerBuilder sb service))
+    (doseq [^BindableService svc (map (partial fetch-service this) services)]
+      (log/info "adding service:" svc)
+      (.addService ^NettyServerBuilder sb svc))
     (let [server (-> sb .build .start)]
       (log/info "built and started server:" server)
       (assoc this ::server server))))
@@ -48,7 +48,9 @@
   (log/info "shutting down server")
   (when (some? server)
     (.shutdown ^Server server)
-    (.awaitTermination ^Server server (or grace-period 2000) TimeUnit/MILLISECONDS))
+    (.awaitTermination ^Server server
+                       (or grace-period 2000)
+                       TimeUnit/MILLISECONDS))
   (log/info "server shutdown completed")
   (dissoc this ::server))
 

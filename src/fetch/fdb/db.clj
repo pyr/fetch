@@ -1,7 +1,6 @@
 (ns fetch.fdb.db
-  (:require [fetch.fdb.fn          :as fn]
-            [exoscale.ex           :as ex]
-            [clojure.tools.logging :as log]
+  (:require [exoscale.ex           :as ex]
+            [fetch.fdb.store       :as store]
             [clojure.spec.alpha    :as s])
   (:import com.apple.foundationdb.Database
            com.apple.foundationdb.FDB
@@ -21,14 +20,6 @@
 (defn close
   [^Database db]
   (.close db))
-
-(defn write-transaction
-  [this f]
-  (.run ^Database (::database this) (fn/wrap #(f % (::dirs this)))))
-
-(defn read-transaction
-  [this f]
-  (.read ^Database (::database this) (fn/wrap #(f % (::dirs this)))))
 
 (defn create-dir
   [^TransactionContext txc path]
@@ -66,17 +57,14 @@
   [db]
   (::database db))
 
-(def ^:private static-instance-id
-  #uuid "4a7517f8-40f0-41ad-9e1d-cae1397c1b23")
-
 (defn- component-start
   [{:fetch.fdb/keys [cluster-file prefix executor] :as fdb}]
   (ex/assert-spec-valid ::config fdb)
   (let [db (open cluster-file executor)]
-    (log/info "successfully opened connection to database")
-    (assoc fdb
-           ::database db
-           ::dirs (make-dirs db prefix static-instance-id))))
+    (with-meta
+      (assoc fdb ::database db)
+      (merge (meta fdb)
+             {`store/prefixed #(assoc %1 ::dirs (make-dirs db prefix %2))}))))
 
 (defn- component-stop
   [{::keys [database] :as fdb}]

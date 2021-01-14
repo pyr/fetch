@@ -2,6 +2,7 @@
   (:require [com.stuartsierra.component :as component :refer [using]]
             [fetch.store                :as store]
             [fetch.fdb                  :as fdb]
+            [fetch.fdb.transaction      :as tx]
             [fetch.fdb.db               :as db]
             [fetch.fdb.op               :as op]
             [fetch.fdb.space            :as space]))
@@ -22,7 +23,7 @@
   (let [prevent-purge? (some? (or (System/getenv "FETCH_TEST_PREVENT_PURGE")
                                   (System/getProperty "fetch.prevent-purge")))]
     (when-not prevent-purge?
-      (db/write-transaction
+      (tx/write-transaction
        fdb
        (fn [tx dirs]
          (doseq [[k d] dirs :when (simple-keyword? k)]
@@ -46,15 +47,15 @@
   {::fdb/cluster-file "/etc/foundationdb/fdb.cluster"
    ::fdb/prefix       (name (gensym "test-etcd"))
    ::fdb              (using fdb/handle [::fdb/cluster-file ::fdb/prefix])
-   ::store/engine     (using fdb/store {:db ::fdb})
    ::cleaner          (using cleaner [::fdb])})
 
 (defn wrap-system-fn
   [sys]
   (fn [f]
-    (let [started (component/start-system (into (component/system-map) (sys)))]
+    (let [started (component/start-system (into (component/system-map) (sys)))
+          uuid    (java.util.UUID/randomUUID)]
       (binding [*system* started
-                *store*  (::store/engine started)
+                *store*  (store/prefixed (str uuid)  (::fdb started))
                 *fdb*    (::fdb started)
                 *lease*  (::lease started)
                 *watch*  (::watch started)

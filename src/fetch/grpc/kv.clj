@@ -4,10 +4,11 @@
    cases we are interested in, this smoothes over parts of
    the etcd API that Kubernetes does not care about. Actual
    operations are then carried out by "
-  (:require [fetch.store       :as store]
-            [fetch.grpc.types  :as types]
-            [fetch.grpc.stream :as stream]
-            [exoscale.ex       :as ex])
+  (:require [fetch.store            :as store]
+            [fetch.grpc.types       :as types]
+            [fetch.grpc.stream      :as stream]
+            [fetch.grpc.context     :as ctx]
+            [exoscale.ex            :as ex])
   (:import exoscale.etcd.api.KVGrpc$KVImplBase))
 
 ;; XXX: debug
@@ -15,79 +16,79 @@
 
 (defn- wrap-fn
   "A wrapper for unary grpc functions"
-  [kvdb f coax-in]
+  [f coax-in]
   (fn [req resp]
     (try
-      (stream/complete! resp (f kvdb (coax-in req)))
+      (stream/complete! resp (f (coax-in req)))
       (catch Exception e
         (stream/error! resp e)))))
 
 (defn update-handler
-  [engine {:keys [key revision value lease]}]
-  (let [[rev kv succeeded?] (store/update-at-revision engine key revision
+  [{:keys [key revision value lease]}]
+  (let [[rev kv succeeded?] (store/update-at-revision (ctx/engine) key revision
                                                       value lease)]
     (if succeeded?
       (types/update-success-response rev)
       (types/update-failure-response rev kv))))
 
 (defn- delete-handler
-  [engine {:keys [key revision]}]
-  (let [[rev kv succeeded?] (store/delete-key engine key revision)]
+  [{:keys [key revision]}]
+  (let [[rev kv succeeded?] (store/delete-key (ctx/engine) key revision)]
     (types/delete-response rev kv succeeded?)))
 
 (defn- create-handler
-  [engine {:keys [key value lease put]}]
+  [{:keys [key value lease put]}]
   (when (:ignore-lease? put)
     (ex/ex-unsupported! "ignoreLease in put"))
   (when (:ignore-value? put)
     (ex/ex-unsupported! "ignoreValue in put"))
   (when (:previous? put)
     (ex/ex-unsupported! "prevKv in put"))
-  (let [[rev ok?] (store/create-if-absent engine key value lease)]
+  (let [[rev ok?] (store/create-if-absent (ctx/engine) key value lease)]
     (if ok?
       (types/create-success-response rev)
       (types/create-already-exists-response rev))))
 
 (defn- txn-handler
-  [engine {:keys [type unsupported] :as req}]
+  [{:keys [type unsupported] :as req}]
   (when (some? unsupported)
     (ex/ex-unsupported! unsupported))
   (case type
-    :update  (update-handler engine req)
-    :delete  (delete-handler engine req)
-    :create  (create-handler engine req)
+    :update  (update-handler req)
+    :delete  (delete-handler req)
+    :create  (create-handler req)
     :compact types/txn-compaction-response))
 
 (defn- get-handler
-  [engine {:keys [key revision]}]
+  [{:keys [key revision]}]
   (let [[rev kv] (if (pos? revision)
-                   (store/get-at-revision engine key revision)
-                   (store/get-latest engine key))]
+                   (store/get-at-revision (ctx/engine) key revision)
+                   (store/get-latest (ctx/engine) key))]
     (types/get-response rev kv)))
 
 (defn- range-prefix-handler
-  [engine {:keys [key revision count-only? limit]}]
+  [{:keys [key revision count-only? limit]}]
   (if count-only?
-    (let [[rev num-keys] (store/count-keys engine key)]
+    (let [[rev num-keys] (store/count-keys (ctx/engine) key)]
       (types/range-count-response rev num-keys))
-    (let [[rev kvs] (store/range-keys engine revision limit key)]
+    (let [[rev kvs] (store/range-keys (ctx/engine) revision limit key)]
       (types/range-response rev limit kvs))))
 
 (defn- range-handler
-  [engine {:keys [unsupported range-end] :as req}]
+  [{:keys [unsupported range-end] :as req}]
   (when (some? unsupported)
     (ex/ex-unsupported! unsupported))
   (if (zero? (count range-end))
-    (get-handler engine req)
-    (range-prefix-handler engine req)))
+    (get-handler req)
+    (range-prefix-handler req)))
 
-(defn- make-service
+(defn make-service
   "Kubernetes only needs two out of five signatures implemented for its
    interaction with etcd: txn and range. create, delete, and update operations
    are performed as part of transactions"
-  [{::store/keys [engine]}]
-  (let [range-fn (wrap-fn engine range-handler types/range-request->map)
-        txn-fn   (wrap-fn engine txn-handler types/txn-request->map)]
+  [_]
+  (let [range-fn (wrap-fn range-handler types/range-request->map)
+        txn-fn   (wrap-fn txn-handler types/txn-request->map)]
     (proxy [KVGrpc$KVImplBase] []
       ;; put and deleteRange can safely report failure
       (put [req resp]

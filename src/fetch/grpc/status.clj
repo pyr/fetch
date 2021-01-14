@@ -46,7 +46,7 @@
    :unimplemented       Status/UNIMPLEMENTED
    :unknown             Status/UNKNOWN})
 
-(defn ex->status
+(defn ^Status ex->status
   "Coerce GRPC statuses into exoscale/ex errors"
   [e]
   (let [e                                 (cond-> e

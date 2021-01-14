@@ -1,6 +1,6 @@
 (ns fetch.watcher
   (:require [qbits.auspex :as a]
-            [fetch.store :as store])
+            [fetch.store  :as store])
   (:import java.util.UUID))
 
 (defprotocol WatchPublisher

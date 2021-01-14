@@ -15,3 +15,7 @@
   (register-key-watch [this instance id prefix revision])
   (cancel-key-watch [this instance id])
   (register-watch-listener [this instance]))
+
+(defprotocol StorageEngineFactory ;; I could not resist :-)
+  :extend-via-metadata true
+  (prefixed [this prefix]))

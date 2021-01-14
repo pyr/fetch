@@ -6,9 +6,9 @@
                  [exoscale/ex               "0.3.16"]
                  [org.foundationdb/fdb-java "6.2.21"]
                  [exoscale/fetch-proto      "0.1.4-SNAPSHOT"]
-                 [io.grpc/grpc-netty        "1.34.1"]
-                 [io.grpc/grpc-core         "1.34.1"]
-                 [io.grpc/grpc-api          "1.34.1"]
+                 [io.grpc/grpc-netty        "1.35.0"]
+                 [io.grpc/grpc-core         "1.35.0"]
+                 [io.grpc/grpc-api          "1.35.0"]
                  [exoscale/mania            "0.1.306"]
                  [exoscale/interceptor      "0.1.9"]]
   :main fetch.main

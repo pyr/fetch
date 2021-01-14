@@ -141,40 +141,6 @@ in some ways and they share a number of common compromises.
 
 https://github.com/k3s-io/kine/
 
-### Reading notes
-
-The source file tree reflects the above split.
-
-```
-src
-└── fetch
-    ├── fdb.clj                    ;; The FoundationDB client code
-    ├── fdb
-    │   ├── db.clj
-    │   ├── fn.clj
-    │   ├── kv.clj
-    │   ├── op.clj
-    │   ├── payload.clj           ;; payload conversion
-    │   ├── space.clj
-    │   ├── tuple.clj
-    │   ├── store.clj             ;; FoundationDB storage engine
-    │   ├── store
-    │   │   ├── common.clj
-    │   │   └── interceptors.clj
-    ├── grpc                       ;; GRPC code
-    │   ├── server.clj            ;; GRPC server
-    │   ├── kv.clj                ;; GRPC services (kv, lease, watch)
-    │   ├── lease.clj
-    │   └── watch.clj
-    │   ├── status.clj            ;; exoscale/ex to GRPC status conversion
-    │   ├── stream.clj
-    │   ├── types.clj
-    ├── main.clj
-    ├── pool.clj
-    ├── store.clj
-    └── watcher.clj
-```
-
 ### Changelog
 
 *no release yet*
