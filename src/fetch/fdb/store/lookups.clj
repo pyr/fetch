@@ -21,6 +21,7 @@
     (->> (op/reverse-range tx range limit)
          (map kv/k)
          (map (partial p/decode-key dirs))
+         ;; XXX: partition kills the limit applied on the range
          (partition-by :key)
          (map first)
          (filter #(>= (:mod-revision %) revision)))))

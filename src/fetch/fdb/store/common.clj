@@ -35,7 +35,7 @@
     rev))
 
 (defn update-usage
-  [tx dirs  byte-count]
+  [tx dirs byte-count]
   (op/mutate tx :add (p/byte-count-key dirs) (p/encode-long byte-count)))
 
 (defn add-event

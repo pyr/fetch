@@ -78,13 +78,12 @@
    db
    (fn [tx dirs]
      (ix/execute (merge params {:op name :tx tx :dirs dirs})
-                 [final record-timing error-report lookup-previous
-                  byte-counter watch-update event-publisher
+                 [final record-timing error-report
                   {:name name :enter handler}]))))
 
 (defn read
   [db name handler params]
-  (tx/write-transaction
+  (tx/read-transaction
    db
    (fn [tx dirs]
      (ix/execute (merge params {:op name :tx tx :dirs dirs})
